@@ -345,7 +345,7 @@ export default function AccountsPage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-2 pr-6 py-2 whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: "20ch" }}>{account.name}</td>
+                    <td className="px-2 pr-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: "20ch" }}>{account.name}</td>
                     {tab === "settings" && (
                       <>
                         <td className="px-[6px] py-2 whitespace-nowrap">{fmtGroup(account.group_number)}</td>
