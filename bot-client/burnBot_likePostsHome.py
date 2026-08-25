@@ -2,6 +2,7 @@
 
 import builtins as _builtins
 from burnBot_imports import *
+from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 from burnBot_utils import process_exception, get_post_author_username
 from burnBot_login import check_phone_verification, switch_login
 from burnBot_accountSession_setup import is_bot_debug_enabled
@@ -170,13 +171,13 @@ def do_login(driver, username, password):
                 EC.presence_of_element_located((By.CSS_SELECTOR, "[aria-label='Phone number, username, or email']"))
             )
             loginUsername.clear()
-            loginUsername.send_keys(username)
+            htype(loginUsername, username)
             
             loginPassword = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "[aria-label='Password']"))
             )
             loginPassword.clear()
-            loginPassword.send_keys(password)
+            htype(loginPassword, password)
             
             # Submit login form
             loginPassword.send_keys(Keys.RETURN)
@@ -309,7 +310,7 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
         driver.get('https://www.instagram.com/')
         WebDriverWait(driver, 15).until(lambda d: d.execute_script('return document.readyState') == 'complete')
         driver.execute_script("window.scrollTo(0, 0)")
-        time.sleep(random.randint(2, 4))
+        hsleep(2, 4)
         
         target_formatted = f"{target_count:02d}"
         
@@ -415,10 +416,8 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
                             like_button = WebDriverWait(article, 5).until(
                                 EC.element_to_be_clickable((By.CSS_SELECTOR, "svg[aria-label='Like']"))
                             )
-                            actions = ActionChains(driver)
-                            actions.move_to_element(article)
-                            actions.click(like_button)
-                            actions.perform()
+                            hhover(driver, article)
+                            hclick(driver, like_button)
 
                             # Count the like only after the heart actually flips
                             # (2026-08-13: an entire topics action's clicks
@@ -439,7 +438,7 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
                             except TimeoutException:
                                 debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_state_unchanged"))
 
-                            time.sleep(random.randint(6, 8))
+                            hsleep(6, 8)
                         else:
                             if like_status:
                                 display_name = article_account[:15] if len(article_account) > 15 else article_account
@@ -458,8 +457,8 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
                     except TimeoutException:
                         pass
                     
-                    driver.execute_script("window.scrollBy(0, 400);")
-                    time.sleep(random.randint(4, 6))
+                    hscroll(driver, 400)
+                    hsleep(4, 6)
                 
                 if likes_performed >= target_count:
                     break

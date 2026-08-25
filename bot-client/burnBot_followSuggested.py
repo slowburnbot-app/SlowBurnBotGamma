@@ -1,4 +1,5 @@
 import time
+from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 import random
 import builtins as _builtins
 from datetime import date
@@ -179,7 +180,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
         try:
             driver.get("https://www.instagram.com/explore/people/")
             WebDriverWait(driver, 15).until(lambda d: d.execute_script("return document.readyState") == "complete")
-            time.sleep(random.uniform(4, 6))
+            hsleep(4, 6)
         except Exception as e:
             error_type = type(e).__name__
             error_msg = str(e).split("\n")[0]
@@ -199,10 +200,10 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
 
                 # Scroll and rescan
                 try:
-                    driver.execute_script("window.scrollBy(0, 900);")
+                    hscroll(driver, 900)
                 except Exception:
                     pass
-                time.sleep(random.uniform(2, 4))
+                hsleep(2, 4)
 
         if explore_candidates:
             _p(client_log_line(account, _scope, f"{_lbl}explore found {len(explore_candidates)} candidate(s)"))
@@ -222,7 +223,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                             actions = ActionChains(driver)
                             actions.move_to_element(user_name_anchor)
                             actions.perform()
-                            time.sleep(random.uniform(1, 3))
+                            hsleep(1, 3)
                         except Exception:
                             pass
 
@@ -245,10 +246,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                     # Click follow
                     click_success = False
                     try:
-                        actions = ActionChains(driver)
-                        actions.move_to_element(follow_button)
-                        actions.click(follow_button)
-                        actions.perform()
+                        hclick(driver, follow_button)
                         click_success = True
                     except Exception:
                         try:
@@ -275,7 +273,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                         follow_date=follow_date,
                     )
                     _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
-                    time.sleep(random.uniform(10, 20))
+                    hsleep(10, 20)
 
                 except StaleElementReferenceException:
                     continue
@@ -303,7 +301,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
 
             driver.get("https://www.instagram.com/")
             WebDriverWait(driver, 15).until(lambda d: d.execute_script('return document.readyState') == 'complete')
-            time.sleep(random.uniform(4, 6))
+            hsleep(4, 6)
 
             # ------------------------------------------------------------------
             # Primary: existing selector logic (keep as-is)
@@ -348,7 +346,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                         actions = ActionChains(driver)
                         actions.move_to_element(user_name_element)
                         actions.perform()
-                        time.sleep(random.uniform(1, 3))
+                        hsleep(1, 3)
 
                         # Check for stale element
                         if not user_name_element.text:
@@ -383,10 +381,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                             # Follow the account
                             followed_count += 1
 
-                            actions = ActionChains(driver)
-                            actions.move_to_element(user_status_element)
-                            actions.click(user_status_element)
-                            actions.perform()
+                            hclick(driver, user_status_element)
 
                             # Log followed account via API
                             _create_follow_entry(
@@ -401,7 +396,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                             _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
 
                             # Delay between follows
-                            time.sleep(random.uniform(10, 20))
+                            hsleep(10, 20)
 
                     except StaleElementReferenceException:
                         continue
@@ -442,7 +437,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                                 actions = ActionChains(driver)
                                 actions.move_to_element(user_name_anchor)
                                 actions.perform()
-                                time.sleep(random.uniform(1, 3))
+                                hsleep(1, 3)
                             except Exception:
                                 pass
 
@@ -466,10 +461,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                             followed_count += 1
 
                             try:
-                                actions = ActionChains(driver)
-                                actions.move_to_element(follow_button)
-                                actions.click(follow_button)
-                                actions.perform()
+                                hclick(driver, follow_button)
                             except Exception:
                                 try:
                                     follow_button.click()
@@ -489,7 +481,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                             )
                             database_names.append(user_name)
                             _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
-                            time.sleep(random.uniform(10, 20))
+                            hsleep(10, 20)
 
                     except StaleElementReferenceException:
                         continue

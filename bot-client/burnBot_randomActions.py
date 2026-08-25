@@ -7,6 +7,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 
+from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 from burnBot_client_log import client_log_line
 
 _p = _builtins.print  # set per-call by do_random_action; safe because sessions run sequentially
@@ -24,7 +25,7 @@ def _human_delay(min_seconds: float, max_seconds: float):
             a = 0
         if b < a:
             b = a
-        time.sleep(random.uniform(a, b))
+        hsleep(a, b)
     except Exception:
         # Never break flows due to delay issues
         try:
@@ -112,7 +113,7 @@ def do_random_explore(driver, account, posts_to_click: int | None = None):
 
             if not candidates:
                 try:
-                    driver.execute_script("window.scrollBy(0, 800);")
+                    hscroll(driver, 800)
                 except Exception:
                     pass
                 _human_delay(3, 6)
@@ -133,11 +134,7 @@ def do_random_explore(driver, account, posts_to_click: int | None = None):
                     _human_delay(0.8, 2.2)
 
                     try:
-                        actions = ActionChains(driver)
-                        actions.move_to_element(a)
-                        _human_delay(0.4, 1.2)
-                        actions.click(a)
-                        actions.perform()
+                        hclick(driver, a)
                     except Exception:
                         try:
                             a.click()
@@ -174,7 +171,7 @@ def do_random_explore(driver, account, posts_to_click: int | None = None):
             # Small scroll between rounds
             if opened < posts_to_click:
                 try:
-                    driver.execute_script("window.scrollBy(0, 700);")
+                    hscroll(driver, 700)
                 except Exception:
                     pass
                 _human_delay(3, 6)
@@ -245,10 +242,10 @@ def do_random_actions(driver, account, reels_to_watch: int = 2):
                         _human_delay(1.2, 2.8)
                         body.send_keys(Keys.ARROWDOWN)
                     else:
-                        driver.execute_script("window.scrollBy(0, 900);")
+                        hscroll(driver, 900)
                 except Exception:
                     try:
-                        driver.execute_script("window.scrollBy(0, 900);")
+                        hscroll(driver, 900)
                     except Exception:
                         pass
 

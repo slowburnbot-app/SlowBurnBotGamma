@@ -1,4 +1,5 @@
 import time
+from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 import random
 import builtins as _builtins
 from datetime import date
@@ -79,11 +80,11 @@ def _open_similar_panel(driver, account, target_account, scope, lbl):
         actions = ActionChains(driver)
         actions.move_to_element(chevron)
         actions.perform()
-        time.sleep(random.uniform(1, 2))
+        hsleep(1, 2)
         actions = ActionChains(driver)
         actions.click(chevron)
         actions.perform()
-        time.sleep(random.uniform(3, 5))
+        hsleep(3, 5)
     except Exception as e:
         msg = f"[{target_account}] failed to open Similar accounts panel: {str(e).splitlines()[0][:80]}"
         _p(client_log_line(account, scope, f"{lbl}Warning: {msg}"))
@@ -112,7 +113,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
             return False
         try:
             driver.execute_script("arguments[0].click();", nxt)
-            time.sleep(random.uniform(2, 4))
+            hsleep(2, 4)
             return True
         except Exception:
             return False
@@ -144,7 +145,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
                 if user_name in database_names:
                     skip_already += 1
                     _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [in database]"))
-                    time.sleep(random.uniform(1, 1))
+                    hsleep(1, 1)
                     continue
 
                 # Hover the username to trigger the profile preview (surfaces the private notice)
@@ -153,7 +154,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
                         actions = ActionChains(driver)
                         actions.move_to_element(user_name_anchor)
                         actions.perform()
-                        time.sleep(random.uniform(1, 2))
+                        hsleep(1, 2)
                     except Exception:
                         pass
 
@@ -177,10 +178,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
                     continue
 
                 try:
-                    actions = ActionChains(driver)
-                    actions.move_to_element(follow_button)
-                    actions.click(follow_button)
-                    actions.perform()
+                    hclick(driver, follow_button)
                 except Exception:
                     driver.execute_script("arguments[0].click();", follow_button)
 
@@ -194,7 +192,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
                 except Exception:
                     pass
                 _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
-                time.sleep(random.uniform(10, 20))
+                hsleep(10, 20)
 
             except StaleElementReferenceException:
                 continue
@@ -268,7 +266,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         target_account_page = f"https://www.instagram.com/{target_account}/"
         driver.get(target_account_page)
         WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
-        time.sleep(random.uniform(3, 5))
+        hsleep(3, 5)
         
         # Check if target account exists
         if driver.find_elements(By.XPATH, "//*[contains(text(), \"Sorry, this page isn't available.\")]"):
@@ -338,12 +336,12 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
             actions = ActionChains(driver)
             actions.move_to_element(target_link)
             actions.perform()
-            time.sleep(random.uniform(2, 4))
+            hsleep(2, 4)
 
             actions = ActionChains(driver)
             actions.click(target_link)
             actions.perform()
-            time.sleep(random.uniform(2, 4))
+            hsleep(2, 4)
         except Exception as e:
             error_msg = f"Failed to open {link_text} dialog: {e}"
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: {error_msg}"))
@@ -386,7 +384,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                     try:
                         window = driver.find_element(By.CLASS_NAME, 'xz65tgg')
                         window.send_keys(Keys.PAGE_DOWN)
-                        time.sleep(random.uniform(2, 4))
+                        hsleep(2, 4)
                         continue
                     except Exception:
                         # Can't scroll anymore, we've reached the end
@@ -401,7 +399,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                 try:
                     window = driver.find_element(By.CLASS_NAME, 'xz65tgg')
                     window.send_keys(Keys.PAGE_DOWN)
-                    time.sleep(random.uniform(1, 3))
+                    hsleep(1, 3)
                     continue
                 except Exception:
                     break
@@ -426,21 +424,21 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                     if user_name in database_names:
                         skip_already += 1
                         _p(client_log_line(account, _scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [in database]"))
-                        time.sleep(random.uniform(1, 1))
+                        hsleep(1, 1)
                         continue
 
                     # Check if already following
                     if user_status != "Follow":
                         skip_already += 1
                         _p(client_log_line(account, _scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [{user_status.lower()}]"))
-                        time.sleep(random.uniform(1, 1))
+                        hsleep(1, 1)
                         continue
                     
                     # Hover over username to trigger profile preview
                     actions = ActionChains(driver)
                     actions.move_to_element(user_name_element)
                     actions.perform()
-                    time.sleep(random.uniform(1, 1))
+                    hsleep(1, 1)
                     
                     # Check for stale element
                     if not user_name_element.text:
@@ -475,10 +473,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                         # Follow the account
                         followed_count += 1
 
-                        actions = ActionChains(driver)
-                        actions.move_to_element(user_status_element)
-                        actions.click(user_status_element)
-                        actions.perform()
+                        hclick(driver, user_status_element)
 
                         # Log followed account via API
                         target_source = f"{target_account}[{action_type}]"
@@ -493,7 +488,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                         _p(client_log_line(account, _scope, f"{target_account}[{action_type}]-[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
                         
                         # Delay between follows
-                        time.sleep(random.uniform(10, 20))
+                        hsleep(10, 20)
                 
                 except StaleElementReferenceException:
                     continue
@@ -511,18 +506,18 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                 try:
                     window = driver.find_element(By.CLASS_NAME, 'xz65tgg')
                     window.send_keys(Keys.PAGE_DOWN)
-                    time.sleep(random.uniform(2, 4))
+                    hsleep(2, 4)
                     
                     # Scroll again for good measure
                     window = driver.find_element(By.CLASS_NAME, 'xz65tgg')
                     window.send_keys(Keys.PAGE_DOWN)
-                    time.sleep(random.uniform(2, 4))
+                    hsleep(2, 4)
                 
                 except StaleElementReferenceException:
                     try:
                         window = driver.find_element(By.CLASS_NAME, 'xz65tgg')
                         window.send_keys(Keys.PAGE_DOWN)
-                        time.sleep(random.uniform(2, 4))
+                        hsleep(2, 4)
                     except Exception:
                         pass
                 except Exception:

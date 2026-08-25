@@ -6,6 +6,7 @@
 
 import builtins as _builtins
 from burnBot_imports import *
+from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 from burnBot_utils import process_exception, get_post_author_username
 from burnBot_accountSession_setup import is_bot_debug_enabled
 from burnBot_client_log import client_log_line
@@ -169,17 +170,13 @@ def _open_post_from_results(driver, account, post_url):
 
     try:
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", result_link)
-        time.sleep(random.uniform(1, 2))
+        hsleep(1, 2)
     except Exception:
         pass
 
     clicked = False
     try:
-        actions = ActionChains(driver)
-        actions.move_to_element(result_link)
-        actions.pause(0.4)
-        actions.click(result_link)
-        actions.perform()
+        hclick(driver, result_link)
         clicked = True
     except Exception:
         pass
@@ -202,7 +199,7 @@ def _open_post_from_results(driver, account, post_url):
                 and len(d.find_elements(By.TAG_NAME, "article")) > 0
             )
         )
-        time.sleep(random.uniform(2, 3))
+        hsleep(2, 3)
         return True
     except Exception:
         debug_line(client_log_line(account, "like-topics", f"debug post did not finish opening for [{post_path}]"))
@@ -232,7 +229,7 @@ def _close_open_post(driver, account, results_url):
                     and len(d.find_elements(By.XPATH, "//a[contains(@href, '/p/')]")) > 0
                 )
             )
-            time.sleep(random.uniform(1, 2))
+            hsleep(1, 2)
             return True
         except Exception:
             pass
@@ -257,7 +254,7 @@ def _close_open_post(driver, account, results_url):
                     and len(d.find_elements(By.XPATH, "//a[contains(@href, '/p/')]")) > 0
                 )
             )
-            time.sleep(random.uniform(1, 2))
+            hsleep(1, 2)
             return True
         except Exception:
             continue
@@ -274,7 +271,7 @@ def _close_open_post(driver, account, results_url):
                     )
                 )
             )
-            time.sleep(random.uniform(1, 2))
+            hsleep(1, 2)
             return True
     except Exception:
         pass
@@ -355,7 +352,7 @@ def _open_topic_search_results(driver, account, topic, account_id=None):
             )
         except Exception:
             pass  # pageLoadStrategy is already 'normal' — driver.get() already blocked on this
-        time.sleep(random.uniform(2, 4))
+        hsleep(2, 4)
 
         _enter("search-open")
         search_clicked = False
@@ -399,7 +396,7 @@ def _open_topic_search_results(driver, account, topic, account_id=None):
                 WebDriverWait(driver, 10).until(
                     lambda d: d.execute_script("return document.readyState") == "complete"
                 )
-                time.sleep(random.uniform(2, 4))
+                hsleep(2, 4)
                 search_clicked = True
                 debug_line(client_log_line(account, "like-topics", f"using direct search page fallback for [{topic}]"))
             except Exception:
@@ -473,8 +470,8 @@ def _open_topic_search_results(driver, account, topic, account_id=None):
             except Exception:
                 pass
 
-        search_input.send_keys(search_query)
-        time.sleep(random.uniform(3, 5))
+        htype(search_input, search_query)
+        hsleep(3, 5)
 
         _enter("keyword-result")
         normalized_query = " ".join(search_query.lower().split())
@@ -550,7 +547,7 @@ def _open_topic_search_results(driver, account, topic, account_id=None):
             _fail("no keyword URL and no /p/ links after search submit")
             return False
         _ok()
-        time.sleep(random.uniform(4, 6))
+        hsleep(4, 6)
         return True
 
     except Exception as e:
@@ -838,11 +835,7 @@ def do_like_posts_topic(driver, account, target_count, apiClient=None, account_i
 
                                 clicked = False
                                 try:
-                                    actions = ActionChains(driver)
-                                    actions.move_to_element(like_button)
-                                    actions.pause(0.5)
-                                    actions.click(like_button)
-                                    actions.perform()
+                                    hclick(driver, like_button)
                                     clicked = True
                                 except Exception:
                                     pass
@@ -865,7 +858,7 @@ def do_like_posts_topic(driver, account, target_count, apiClient=None, account_i
                                         likes_performed += 1
                                         count_formatted = f"{likes_performed:02d}"
                                         _p(client_log_line(account, _scope, f"{_lbl}[{count_formatted}/{target_formatted}] - [{display_name}]"))
-                                        time.sleep(random.randint(6, 8))
+                                        hsleep(6, 8)
                                     except Exception:
                                         debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_state_unchanged"))
                                         if like_diag_reports < _MAX_LIKE_DIAG_REPORTS:
@@ -931,8 +924,8 @@ def do_like_posts_topic(driver, account, target_count, apiClient=None, account_i
                             else:
                                 moduleErrorsLog += f"like[topics]: [error] could not refresh search results for [{topic}]\n"
                             break
-                    driver.execute_script("window.scrollBy(0, 900);")
-                    time.sleep(random.uniform(2, 3))
+                    hscroll(driver, 900)
+                    hsleep(2, 3)
                     scrolls += 1
                 else:
                     break

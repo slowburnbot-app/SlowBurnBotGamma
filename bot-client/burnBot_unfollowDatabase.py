@@ -2,6 +2,7 @@
 
 import builtins as _builtins
 from burnBot_imports import *
+from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 from burnBot_utils import process_exception
 from burnBot_client_log import client_log_line
 from datetime import date, datetime, timedelta
@@ -29,7 +30,7 @@ def ensure_dialog_open(driver, dialog_type):
             link = driver.find_element(By.PARTIAL_LINK_TEXT, "followers")
 
         ActionChains(driver).move_to_element(link).click().perform()
-        time.sleep(random.randint(2, 4))
+        hsleep(2, 4)
 
         # Verify dialog opened
         WebDriverWait(driver, 5).until(
@@ -76,7 +77,7 @@ def search_for_profile(driver, username, target_username):
 
         # Type text
         search_text = username[:20]
-        searchBox.send_keys(search_text)
+        htype(searchBox, search_text)
         time.sleep(0.5)
 
         # Verify text was entered - if not, use JavaScript
@@ -148,7 +149,7 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
         active_account_page = f"https://www.instagram.com/{account}/"
         driver.get(active_account_page)
         WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
-        time.sleep(random.randint(2, 4))
+        hsleep(2, 4)
 
         # Save the main window handle
         main_window = driver.current_window_handle
@@ -158,7 +159,7 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
         driver.switch_to.new_window('tab')
         driver.get(active_account_page)
         WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
-        time.sleep(random.randint(2, 4))
+        hsleep(2, 4)
 
         following_window = driver.current_window_handle
 
@@ -166,7 +167,7 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
         try:
             following_link = driver.find_element(By.PARTIAL_LINK_TEXT, "following")
             ActionChains(driver).move_to_element(following_link).click().perform()
-            time.sleep(random.randint(2, 4))
+            hsleep(2, 4)
         except Exception as e:
             _p(client_log_line(account, _log_scope, f"{_lbl}ERROR: Could not open following dialog"))
             driver.close()
@@ -178,7 +179,7 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
         driver.switch_to.new_window('tab')
         driver.get(active_account_page)
         WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
-        time.sleep(random.randint(2, 4))
+        hsleep(2, 4)
 
         followers_window = driver.current_window_handle
 
@@ -186,7 +187,7 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
         try:
             followers_link = driver.find_element(By.PARTIAL_LINK_TEXT, "followers")
             ActionChains(driver).move_to_element(followers_link).click().perform()
-            time.sleep(random.randint(2, 4))
+            hsleep(2, 4)
         except Exception as e:
             _p(client_log_line(account, _log_scope, f"{_lbl}ERROR: Could not open followers dialog"))
             driver.close()
@@ -276,14 +277,14 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
                         follow_button = account_box.find_element(By.XPATH, ".//button[.//div[contains(text(), 'ollow')]]")
 
                         # Click to trigger unfollow modal
-                        ActionChains(driver).move_to_element(follow_button).click().perform()
-                        time.sleep(random.randint(3, 5))
+                        hclick(driver, follow_button)
+                        hsleep(3, 5)
 
                         # Click unfollow confirmation
                         unfollow_confirm = WebDriverWait(driver, 6).until(
                             EC.element_to_be_clickable((By.CLASS_NAME, "_a9-_"))
                         )
-                        ActionChains(driver).move_to_element(unfollow_confirm).click().perform()
+                        hclick(driver, unfollow_confirm)
 
                         # The confirm click landed — this is a genuine unfollow,
                         # not just an attempt. Count it here, not per-loop-iteration.
@@ -305,7 +306,7 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
                         except Exception as update_error:
                             moduleErrorsLog += f"Could not update target for {loop_username}: {update_error}\n"
 
-                        time.sleep(random.randint(4, 6))
+                        hsleep(4, 6)
 
                     except Exception as e:
                         _p(client_log_line(account, _log_scope, f"{_lbl}{count_formatted}/{target_formatted} @{loop_username} error"))

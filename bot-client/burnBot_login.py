@@ -1,6 +1,7 @@
 # burnBot_login.py
 
 from burnBot_imports import *
+from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 from burnBot_utils import close_windows, has_internet_connection, process_exception, delay
 from burnBot_client_log import client_log_line
 from burnBot_run_log import debug_line
@@ -1164,7 +1165,7 @@ def do_login(driver, username, password, apiClient=None):
 
             loginUsername.clear()
             time.sleep(0.2)
-            loginUsername.send_keys(username)
+            htype(loginUsername, username)
             time.sleep(0.3)
             
             debug_line(f"-- DEBUG: Username entered successfully")
@@ -1207,7 +1208,7 @@ def do_login(driver, username, password, apiClient=None):
 
             loginPassword.clear()
             time.sleep(0.2)
-            loginPassword.send_keys(password)
+            htype(loginPassword, password)
             time.sleep(0.3)
             
             debug_line(f"-- DEBUG: Password entered successfully")
@@ -1406,7 +1407,7 @@ def switch_login(driver, targetAccount):
             )
             switchLink.click()
             
-            time.sleep(random.randint(4, 7))
+            hsleep(4, 7)
         except (NoSuchElementException, StaleElementReferenceException, TimeoutException) as e:
             moduleErrorsLog += f"cant find switch account link: {str(e)}"
             return False, None, moduleErrorsLog
