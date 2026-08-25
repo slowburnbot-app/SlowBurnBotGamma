@@ -580,6 +580,70 @@ try:
             status_store.add_log(client_log_line(None, "api", "Access token refreshed."))
         _last_token_refresh = time.monotonic()
 
+        def _inactive_reason(acct):
+            """Status label for an account the loop must not run, or None if it is runnable."""
+            if acct.get("system_disabled"):
+                return "system-disabled"
+            if not acct.get("enabled", False):
+                return "disabled"
+            return None
+
+        def _refresh_state():
+            """Consolidated state poll (accounts + settings + user config + entitlement).
+
+            Rebinds all_accounts when the server reports a change. Returns
+            "auth_failed" / "stopped" when the loop must end, else None. Called
+            at the top of every loop iteration AND periodically while a session
+            is running, so dashboard edits (e.g. disabling an account) land
+            without waiting for the running session to finish.
+            """
+            nonlocal _known_version, all_accounts
+            _state = None
+            try:
+                group_param = int(client_id_norm) if client_id_norm else None
+                try:
+                    _state = apiClient.get_client_state(group_number=group_param, known_version=_known_version)
+                except AuthenticationError:
+                    if _try_api_relogin_from_config(apiClient):
+                        try:
+                            _state = apiClient.get_client_state(group_number=group_param, known_version=_known_version)
+                        except AuthenticationError:
+                            console.print(client_log_line(None, "system", "Session expired after re-login. Check [api_credentials] or dashboard."))
+                            status_store.set_auth_failed()
+                            stop_flag.set()
+                            return "auth_failed"
+                    else:
+                        console.print(client_log_line(None, "system", "Session expired. Set [api_credentials] in burnBot_config.ini or restart and log in."))
+                        status_store.set_auth_failed()
+                        stop_flag.set()
+                        return "auth_failed"
+            except Exception as e:
+                debug_line(client_log_line(None, "system", f"Warning - state refresh failed, using cached values: {e}"))
+
+            # Mid-run entitlement check and account/settings refresh
+            if _state is not None:
+                _entitlement = _state.get("entitlement", {})
+                if not _entitlement.get("active"):
+                    status_store.add_log(client_log_line(None, "api", "Subscription is no longer active — stopping."))
+                    stop_flag.set()
+                    return "stopped"
+                if _state.get("changed"):
+                    _known_version = _state.get("version", _known_version)
+                    all_accounts = _state.get("accounts") or all_accounts
+                    status_store.set_remote_debug((_state.get("user_config") or {}).get('bot_debug'))
+                status_store.set_current_bot_version(_state.get("current_bot_version"))
+            return None
+
+        def _mark_inactive_rows(skip=None):
+            """Push disabled/system-disabled status for every non-runnable account (except `skip`)."""
+            for _a in all_accounts:
+                _n = _a.get("name", "")
+                _reason = _inactive_reason(_a)
+                if _n and _n != skip and _reason:
+                    status_store.update(_n, status=_reason, next_run="—", last_action="—", run_info="—")
+
+        _SESSION_STATE_POLL = 30  # seconds between state polls while a session is running
+
         # ------------------------------------------------------------------
         # Main loop
         # ------------------------------------------------------------------
@@ -595,51 +659,17 @@ try:
                     _last_token_refresh = time.monotonic() - _TOKEN_REFRESH_INTERVAL + _TOKEN_REFRESH_RETRY
 
             # Consolidated state fetch (accounts + settings + user config + entitlement)
-            _state = None
-            try:
-                group_param = int(client_id_norm) if client_id_norm else None
-                try:
-                    _state = apiClient.get_client_state(group_number=group_param, known_version=_known_version)
-                except AuthenticationError:
-                    if _try_api_relogin_from_config(apiClient):
-                        try:
-                            _state = apiClient.get_client_state(group_number=group_param, known_version=_known_version)
-                        except AuthenticationError:
-                            console.print(client_log_line(None, "system", "Session expired after re-login. Check [api_credentials] or dashboard."))
-                            status_store.set_auth_failed()
-                            stop_flag.set()
-                            break
-                    else:
-                        console.print(client_log_line(None, "system", "Session expired. Set [api_credentials] in burnBot_config.ini or restart and log in."))
-                        status_store.set_auth_failed()
-                        stop_flag.set()
-                        break
-            except Exception as e:
-                debug_line(client_log_line(None, "system", f"Warning - state refresh failed, using cached values: {e}"))
-
-            # Mid-run entitlement check and account/settings refresh
-            if _state is not None:
-                _entitlement = _state.get("entitlement", {})
-                if not _entitlement.get("active"):
-                    status_store.add_log(client_log_line(None, "api", "Subscription is no longer active — stopping."))
-                    stop_flag.set()
-                    return
-                if _state.get("changed"):
-                    _known_version = _state.get("version", _known_version)
-                    all_accounts = _state.get("accounts") or all_accounts
-                    status_store.set_remote_debug((_state.get("user_config") or {}).get('bot_debug'))
-                status_store.set_current_bot_version(_state.get("current_bot_version"))
+            _outcome = _refresh_state()
+            if _outcome == "auth_failed":
+                break
+            if _outcome == "stopped":
+                return
 
             # Pre-populate table so all accounts appear immediately on first loop
             for _acct in all_accounts:
                 _name = _acct.get("name", "")
                 if _name and _name not in status_store._store:
-                    if _acct.get("system_disabled"):
-                        _pre_st = "system-disabled"
-                    elif not _acct.get("enabled", False):
-                        _pre_st = "disabled"
-                    else:
-                        _pre_st = "initializing"
+                    _pre_st = _inactive_reason(_acct) or "initializing"
                     status_store.update(_name, status=_pre_st, next_run="—", last_action="—", run_info="—")
 
             # Rebuild enabled accounts and update schedules
@@ -717,13 +747,7 @@ try:
                 account_id = acct.get("id", "")
 
                 if account_name not in enabled_accounts:
-                    skip_reasons = []
-                    if acct.get("system_disabled"):
-                        skip_reasons.append("system-disabled")
-                    elif not acct.get("enabled"):
-                        skip_reasons.append("disabled")
-                    skip_msg = "/".join(skip_reasons) if skip_reasons else "disabled"
-                    status_store.update(account_name, status=skip_msg, next_run="—", last_action="—", run_info="—")
+                    status_store.update(account_name, status=_inactive_reason(acct) or "disabled", next_run="—", last_action="—", run_info="—")
                     continue
 
                 # Pause check — user typed /pause at runtime
@@ -807,6 +831,17 @@ try:
 
                 # Show account status / trigger run
                 if should_run:
+                    # `acct`/`enabled_accounts` were captured when this iteration began; an
+                    # earlier account's session may have blocked for a long time since then.
+                    # Re-poll and re-check so an account disabled on the dashboard mid-iteration
+                    # is not triggered on stale data.
+                    _refresh_state()
+                    _live = next((a for a in all_accounts if a.get("name") == account_name), acct)
+                    _live_reason = _inactive_reason(_live)
+                    if _live_reason:
+                        status_store.update(account_name, status=_live_reason, next_run="—", last_action="—", run_info="—")
+                        continue
+
                     status_store.wait_vnc_ready()
                     run_count = run_counter.get_run_count(account_name)
                     next_run = run_count + 1
@@ -854,12 +889,19 @@ try:
                     # Set account to active
                     threads_active[account_idx].set()
 
-                    # Wait for account to complete and return to idle
+                    # Wait for account to complete and return to idle. Keep polling state
+                    # meanwhile so the other accounts' rows reflect dashboard edits (a
+                    # disable toggle used to sit invisible until this session finished).
+                    _next_state_poll = time.monotonic() + _SESSION_STATE_POLL
                     while threads_active[account_idx].is_set():
                         if status_store.is_bot_paused():
                             threads_active[account_idx].clear()
                         if not session_thread.is_alive():
                             break
+                        if time.monotonic() >= _next_state_poll:
+                            _refresh_state()
+                            _mark_inactive_rows(skip=account_name)
+                            _next_state_poll = time.monotonic() + _SESSION_STATE_POLL
                         time.sleep(1)
 
                     if not session_thread.is_alive():
