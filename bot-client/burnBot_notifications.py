@@ -4,7 +4,7 @@
 
 import builtins
 
-from burnBot_client_log import client_log_line
+from burnBot_client_log import client_log_line, summarize_issue_log
 from burnBot_run_log import debug_line
 
 
@@ -289,11 +289,24 @@ def send_session_complete_notification(account, start_time, end_time,
                 sms_actions.append(formatted)
 
         sms_actions_str = "\n".join(sms_actions) if sms_actions else "no actions"
-        sms_summary = f"{account} [{run_info}]\n{sms_actions_str}\n{start_str}-{end_str} [{duration_str}]"
-        if error_log:
-            sms_summary += f"\n{error_log}"
-        if warning_log:
-            sms_summary += f"\nWarnings:\n{warning_log}"
+
+        # SMS is capped at ~160 chars (see _dispatch/send_sms) and gets
+        # hard-truncated from the tail. Errors/warnings used to be appended
+        # last, so they were the first thing to get cut on any run with
+        # enough actions/timing text to fill the budget. Put one-line
+        # summaries of them right after the header instead, so they survive
+        # truncation; actions detail and timing (both already visible in the
+        # dashboard run log) are lower priority and get dropped first.
+        sms_parts = [f"{account} [{run_info}]"]
+        err_summary = summarize_issue_log(error_log, max_len=50) if error_log else None
+        warn_summary = summarize_issue_log(warning_log, max_len=50) if warning_log else None
+        if err_summary:
+            sms_parts.append(f"ERROR: {err_summary}")
+        if warn_summary:
+            sms_parts.append(f"WARN: {warn_summary}")
+        sms_parts.append(sms_actions_str)
+        sms_parts.append(f"{start_str}-{end_str} [{duration_str}]")
+        sms_summary = "\n".join(sms_parts)
 
         send_admin_notification(account, message, subject_prefix="Session Complete", sms_summary=sms_summary, subject_override=subject_override, apiClient=apiClient, account_id=account_id, _print=_print)
 

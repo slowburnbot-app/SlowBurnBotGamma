@@ -54,6 +54,19 @@ def client_log_line(account: Optional[str], scope: str, message: str = "") -> st
     return f"{ts} {prefix:<{PREFIX_COL}} {msg}".rstrip()
 
 
+def summarize_issue_log(log_text: str, max_len: int = 60) -> Optional[str]:
+    """Collapse a newline-joined error/warning log into a short one-line summary."""
+    lines = [l.strip() for l in (log_text or "").strip().splitlines() if l.strip()]
+    if not lines:
+        return None
+    summary = lines[0]
+    if len(lines) > 1:
+        summary += f" (+{len(lines) - 1} more)"
+    if len(summary) > max_len:
+        summary = summary[: max_len - 1] + "…"
+    return summary
+
+
 def action_combo_slug(act_type: str, act_target: str) -> Optional[str]:
     """Hyphenated action-target for dashboard/API type+target pairs (single source of truth)."""
     t = (act_type or "").strip().lower()
@@ -71,6 +84,7 @@ def action_combo_slug(act_type: str, act_target: str) -> Optional[str]:
             "following[group]",
             "account list [followers]",
             "account list [following]",
+            "account list [similar]",
         ):
             return "follow-group"
     if t == "unfollow":
@@ -93,6 +107,8 @@ def action_target_label(act_type: str, act_target: str) -> str:
     if t == "follow":
         if g in ("suggested", "home", "homepage", "suggested users"):
             return "follow[suggested]"
+        if g == "account list [similar]":
+            return "follow[similar]"
         if "follower" in g:
             return "follow[followers]"
         if "following" in g:

@@ -11,6 +11,7 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 from burnBot_utils import process_exception
 from burnBot_client_log import client_log_line
 from burnBot_run_log import debug_line
+from burnBot_followSuggested import _find_home_follow_candidates
 import burnBot_status as status_store
 
 _p = _builtins.print  # set per-call by do_follow_group; safe because sessions run sequentially
@@ -19,6 +20,194 @@ _p = _builtins.print  # set per-call by do_follow_group; safe because sessions r
 # that happens to open on a run of already-followeds doesn't cry wolf.
 _SATURATION_MIN_ENTRIES = 40
 _SATURATION_WARN_RATIO = 0.80
+
+# A profile page carries a "Suggested for you" carousel of accounts related to
+# that profile. On profiles the viewing account does NOT follow it renders
+# expanded below the header; on followed profiles it is collapsed behind the
+# "Similar accounts" chevron in the header (verified 2026-08-25). The <svg> is
+# SVG-namespaced, so a bare `//svg[...]` XPath never matches — locate it by
+# CSS, then walk up to the nearest role=button ancestor (two levels up).
+_SIMILAR_CHEVRON_CSS = "svg[aria-label='Similar accounts']"
+_SIMILAR_NEXT_XPATH = "//button[@aria-label='Next'] | //*[@role='button'][@aria-label='Next']"
+
+
+def _saturation_warning(account, scope, lbl, action_label, target_account, skip_already, skip_private, followed_count):
+    """Saturation check: how much of the target's pool was un-followable.
+    Prints the warning/debug line and returns the text to append to the module warnings log."""
+    processed = skip_already + skip_private + followed_count
+    if processed <= 0:
+        return ""
+    saturation = skip_already / processed
+    pct = round(saturation * 100)
+    if processed >= _SATURATION_MIN_ENTRIES and saturation >= _SATURATION_WARN_RATIO:
+        _p(client_log_line(account, scope, f"{lbl}Warning: [{target_account}] {pct}% saturated ({skip_already} of {processed} entries already followed) - consider rotating target accounts"))
+        return f"{action_label or 'follow[group]'}: [{target_account}] {pct}% saturated ({skip_already}/{processed} already followed) - rotate targets\n"
+    debug_line(client_log_line(account, scope, f"{lbl}debug target [{target_account}] saturation {pct}% ({skip_already} of {processed} entries already followed)"))
+    return ""
+
+
+def _find_similar_chevron(driver):
+    """Return the clickable ancestor of the Similar-accounts chevron, or None."""
+    try:
+        svg = driver.find_element(By.CSS_SELECTOR, _SIMILAR_CHEVRON_CSS)
+        return svg.find_element(By.XPATH, "./ancestor::*[@role='button' or self::button][1]")
+    except Exception:
+        return None
+
+
+def _similar_panel_expanded(driver, target_account):
+    """True when the suggestions carousel is on the page: a Next arrow plus at least one
+    Follow candidate other than the target's own header button."""
+    if not driver.find_elements(By.XPATH, _SIMILAR_NEXT_XPATH):
+        return False
+    return any(u.lower() != target_account.lower() for u, _b, _a in _find_home_follow_candidates(driver, max_candidates=5))
+
+
+def _open_similar_panel(driver, account, target_account, scope, lbl):
+    """Make sure the target's suggestions carousel is expanded. Returns (opened: bool, warning: str)."""
+    if _similar_panel_expanded(driver, target_account):
+        _p(client_log_line(account, scope, f"{lbl}Suggested for you strip already expanded for {target_account}"))
+        return True, ""
+
+    chevron = _find_similar_chevron(driver)
+    if chevron is None:
+        msg = f"[{target_account}] no Similar accounts panel found - skipping"
+        _p(client_log_line(account, scope, f"{lbl}Warning: {msg}"))
+        return False, f"follow[similar]: {msg}\n"
+
+    try:
+        actions = ActionChains(driver)
+        actions.move_to_element(chevron)
+        actions.perform()
+        time.sleep(random.uniform(1, 2))
+        actions = ActionChains(driver)
+        actions.click(chevron)
+        actions.perform()
+        time.sleep(random.uniform(3, 5))
+    except Exception as e:
+        msg = f"[{target_account}] failed to open Similar accounts panel: {str(e).splitlines()[0][:80]}"
+        _p(client_log_line(account, scope, f"{lbl}Warning: {msg}"))
+        return False, f"follow[similar]: {msg}\n"
+
+    _p(client_log_line(account, scope, f"{lbl}Similar accounts panel opened for {target_account}"))
+    return True, ""
+
+
+def _harvest_similar_accounts(driver, account, target_count, apiClient, account_id, target_account, database_names, follow_date, scope, lbl):
+    """Follow accounts from the (already opened) Similar-accounts carousel, paging with its
+    Next arrow. Returns (followed_count, skip_already, skip_private, errors_log)."""
+    action_type = "similar"
+    followed_count = 0
+    skip_already = 0
+    skip_private = 0
+    module_errors_log = ""
+    seen = set()
+    stall_pages = 0
+    max_stall_pages = 3  # consecutive pages with no unseen handles before treating as end of carousel
+
+    def _advance():
+        try:
+            nxt = driver.find_element(By.XPATH, _SIMILAR_NEXT_XPATH)
+        except Exception:
+            return False
+        try:
+            driver.execute_script("arguments[0].click();", nxt)
+            time.sleep(random.uniform(2, 4))
+            return True
+        except Exception:
+            return False
+
+    while followed_count < target_count:
+        if status_store.is_bot_paused():
+            break
+
+        # The target's own header Follow button resolves to the target's handle under the
+        # candidate heuristic — never treat it as a suggestion.
+        candidates = [
+            c for c in _find_home_follow_candidates(driver, max_candidates=60)
+            if c[0] not in seen and c[0].lower() != target_account.lower()
+        ]
+        if not candidates:
+            stall_pages += 1
+            if stall_pages >= max_stall_pages or not _advance():
+                _p(client_log_line(account, scope, f"{lbl}Warning: reached end of Similar accounts [{followed_count}/{target_count}]"))
+                break
+            continue
+        stall_pages = 0
+
+        for user_name, follow_button, user_name_anchor in candidates:
+            if status_store.is_bot_paused() or followed_count >= target_count:
+                break
+            seen.add(user_name)
+
+            try:
+                if user_name in database_names:
+                    skip_already += 1
+                    _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [in database]"))
+                    time.sleep(random.uniform(1, 1))
+                    continue
+
+                # Hover the username to trigger the profile preview (surfaces the private notice)
+                if user_name_anchor is not None:
+                    try:
+                        actions = ActionChains(driver)
+                        actions.move_to_element(user_name_anchor)
+                        actions.perform()
+                        time.sleep(random.uniform(1, 2))
+                    except Exception:
+                        pass
+
+                page = driver.page_source or ""
+                _is_private = ("The account is private" in page) or ("This Account is Private" in page)
+                _skip_private = False
+                if _is_private:
+                    user_config = apiClient.get_user_config() if apiClient else None
+                    _skip_private = bool(user_config and user_config.get('skip_private', False))
+                if _is_private and _skip_private:
+                    try:
+                        apiClient.create_follow_target(
+                            account_id, user_name, source=f"{target_account}[{action_type}]",
+                            status="private", follow_date=follow_date,
+                        )
+                    except Exception:
+                        pass
+                    database_names.append(user_name)
+                    skip_private += 1
+                    _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [private]"))
+                    continue
+
+                try:
+                    actions = ActionChains(driver)
+                    actions.move_to_element(follow_button)
+                    actions.click(follow_button)
+                    actions.perform()
+                except Exception:
+                    driver.execute_script("arguments[0].click();", follow_button)
+
+                followed_count += 1
+                database_names.append(user_name)
+                try:
+                    apiClient.create_follow_target(
+                        account_id, user_name, source=f"{target_account}[{action_type}]",
+                        status="following", follow_date=follow_date,
+                    )
+                except Exception:
+                    pass
+                _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
+                time.sleep(random.uniform(10, 20))
+
+            except StaleElementReferenceException:
+                continue
+            except Exception as e:
+                error_msg = process_exception(True, f"follow user failed: {e}", True, False)
+                module_errors_log += error_msg
+                continue
+
+        if followed_count < target_count and not _advance():
+            _p(client_log_line(account, scope, f"{lbl}Warning: reached end of Similar accounts [{followed_count}/{target_count}]"))
+            break
+
+    return followed_count, skip_already, skip_private, module_errors_log
 
 
 def do_follow_group(driver, account, target_count, apiClient, account_id, group_type, target_accounts, _print=None, log_scope=None, action_label=None):
@@ -87,6 +276,23 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: {error_msg}"))
             return 0, error_msg
         
+        # Similar accounts: no followers/following dialog — a carousel off the profile header.
+        if group_type == "account list [similar]":
+            opened, _warn = _open_similar_panel(driver, account, target_account, _scope, _lbl)
+            module_warnings_log += _warn
+            if not opened:
+                return 0, module_errors_log, module_warnings_log
+            followed_count, skip_already, skip_private, _errs = _harvest_similar_accounts(
+                driver, account, target_count, apiClient, account_id, target_account,
+                database_names, follow_date, _scope, _lbl,
+            )
+            module_errors_log += _errs
+            _p(client_log_line(account, _scope, f"{_done_lbl}-Completed[{followed_count}/{target_count}]"))
+            module_warnings_log += _saturation_warning(
+                account, _scope, _lbl, action_label, target_account, skip_already, skip_private, followed_count,
+            )
+            return followed_count, module_errors_log, module_warnings_log
+
         # Determine which link to click (followers or following)
         if group_type in ("followers[group]", "account list [followers]"):
             link_text = 'followers'
@@ -324,16 +530,9 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         
         _p(client_log_line(account, _scope, f"{_done_lbl}-Completed[{followed_count}/{target_count}]"))
 
-        # Saturation check: how much of the target's list was un-followable.
-        processed = skip_already + skip_private + followed_count
-        if processed > 0:
-            saturation = skip_already / processed
-            pct = round(saturation * 100)
-            if processed >= _SATURATION_MIN_ENTRIES and saturation >= _SATURATION_WARN_RATIO:
-                _p(client_log_line(account, _scope, f"{_lbl}Warning: [{target_account}] {pct}% saturated ({skip_already} of {processed} entries already followed) - consider rotating target accounts"))
-                module_warnings_log += f"{action_label or 'follow[group]'}: [{target_account}] {pct}% saturated ({skip_already}/{processed} already followed) - rotate targets\n"
-            else:
-                debug_line(client_log_line(account, _scope, f"{_lbl}debug target [{target_account}] saturation {pct}% ({skip_already} of {processed} entries already followed)"))
+        module_warnings_log += _saturation_warning(
+            account, _scope, _lbl, action_label, target_account, skip_already, skip_private, followed_count,
+        )
 
     except Exception as e:
         error_msg = process_exception(True, f"follow group failed: {e}", True, True)

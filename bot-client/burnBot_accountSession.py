@@ -13,7 +13,7 @@ from burnBot_unfollowDatabase import do_unfollow_database
 from burnBot_followSuggested import do_follow_suggested
 from burnBot_followGroup import do_follow_group
 from burnBot_randomActions import do_random_action
-from burnBot_client_log import client_log_line, action_combo_slug, action_target_label
+from burnBot_client_log import client_log_line, action_combo_slug, action_target_label, summarize_issue_log
 from burnBot_run_log import set_session_context, clear_session_context, capture_failure_context, report_failure, flush_session_log, debug_line
 import burnBot_status as status_store
 
@@ -43,19 +43,6 @@ def _unpack_action_result(result, fn_name, account, slot_num, _print):
         bad_msg = f"action[{slot_num}]: bad return arity from {fn_name}: {type(result).__name__}"
     _print(client_log_line(account, f"action[{slot_num}]", f"ERROR: {bad_msg}"))
     return 0, bad_msg + "\n", ""
-
-
-def _summarize_issue_log(log_text, max_len=60):
-    """Collapse a newline-joined error/warning log into a short one-line summary."""
-    lines = [l.strip() for l in log_text.strip().splitlines() if l.strip()]
-    if not lines:
-        return None
-    summary = lines[0]
-    if len(lines) > 1:
-        summary += f" (+{len(lines) - 1} more)"
-    if len(summary) > max_len:
-        summary = summary[:max_len - 1] + "…"
-    return summary
 
 
 def _parse_actions(settings):
@@ -382,7 +369,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                                         moduleWarningsLog += _warns
                                     _ran = True
 
-                                elif _act_type == "follow" and _act_target in ["followers[group]", "following[group]", "account list [followers]", "account list [following]"]:
+                                elif _act_type == "follow" and _act_target in ["followers[group]", "following[group]", "account list [followers]", "account list [following]", "account list [similar]"]:
                                     _target_accounts = account_list_tab
                                     if _target_accounts:
                                         _count, _errs, _warns = _unpack_action_result(
@@ -522,8 +509,8 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                     _print(client_log_line(account, "summary", f"Session[{_run_label}] - {actions_run} action(s) executed"))
                     _print(client_log_line(account, "summary", f"Session[{_run_label}] - DONE"))
 
-                    _err_summary = _summarize_issue_log(moduleErrorsLog)
-                    _warn_summary = _summarize_issue_log(moduleWarningsLog)
+                    _err_summary = summarize_issue_log(moduleErrorsLog)
+                    _warn_summary = summarize_issue_log(moduleWarningsLog)
                     if _err_summary:
                         _session_last_action = f"session complete - error[{_err_summary}]"
                     elif _warn_summary:
