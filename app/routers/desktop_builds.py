@@ -209,13 +209,28 @@ async def get_download_url(
             detail="Object storage not configured.",
         )
 
+    # Serve the current released version (what the dashboard "update available" banner
+    # shows) so re-downloading an existing slot picks up new releases. The slot's own
+    # provisioned version and -latest remain fallbacks. The sync-bot-version endpoint
+    # only advances current_bot_version once SlowBurnBot-<version>.exe exists in the
+    # bucket, so that key is safe to prefer.
+    sc = await _get_system_config(session)
     candidate_keys: list[str] = []
+    seen: set[str] = set()
+
+    def _add(key: str) -> None:
+        if key not in seen:
+            seen.add(key)
+            candidate_keys.append(key)
+
+    if sc.current_bot_version:
+        _add(f"releases/windows/SlowBurnBot-{sc.current_bot_version}.exe")
     if build.bot_version:
-        candidate_keys.append(f"releases/windows/SlowBurnBot-{build.bot_version}.exe")
-    candidate_keys.append("releases/windows/SlowBurnBot-latest.exe")
+        _add(f"releases/windows/SlowBurnBot-{build.bot_version}.exe")
+    _add("releases/windows/SlowBurnBot-latest.exe")
     # Backward compatibility for buckets populated before versioned/latest naming.
-    candidate_keys.append("releases/windows/SlowBurnBot.exe")
-    candidate_keys.append("SlowBurnBot.exe")
+    _add("releases/windows/SlowBurnBot.exe")
+    _add("SlowBurnBot.exe")
 
     selected_key = next((key for key in candidate_keys if object_exists(key)), None)
     if selected_key is None:
