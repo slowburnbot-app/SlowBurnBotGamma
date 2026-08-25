@@ -1536,20 +1536,17 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                     f"login try={attempt}/{login_tries} → ok={is_logged_in} user={current_user}",
                 ))
             
-            # Switch account if needed (skip if verification required)
-            if is_logged_in and is_logged_in != "VERIFICATION_REQUIRED" and account != current_user:
-                print(client_log_line(account, "login", f"switch try={attempt}/{login_tries} → switching"))
-                is_logged_in, current_user, loginErrors = switch_login(driver, account)
-                
-                if loginErrors:
-                    loginDiag += loginErrors
-                if loginErrors:
-                    debug_line(client_log_line(account, "login", f"debug switch_login errors: {loginErrors}"))
-                
-                print(client_log_line(
-                    account, "login",
-                    f"switch try={attempt}/{login_tries} → ok={is_logged_in} user={current_user}",
-                ))
+            # Profile is logged in as a different user. Do NOT walk Instagram's account
+            # switcher (switch_login) — doing so links the two accounts server-side.
+            # Fail the session and let the operator log out manually (noVNC / desktop).
+            if is_logged_in and is_logged_in != "VERIFICATION_REQUIRED" and current_user and account != current_user:
+                error_msg = (
+                    f"profile is logged in as @{current_user} — refusing to switch accounts; "
+                    f"log out of @{current_user} in this browser profile manually, then re-run"
+                )
+                print(client_log_line(account, "login", f"failed — {error_msg}"))
+                loginDiag += f" wrong_user={current_user}"
+                return False, current_user, True, attempts_made, False, loginDiag
             
             # Break if successful (skip if verification required)
             if account == current_user and is_logged_in and is_logged_in != "VERIFICATION_REQUIRED":

@@ -103,11 +103,6 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
     time.sleep(1)
     _print(client_log_line(account, "browser", "start thread"))
 
-    # User agent from local config
-    accountAgent = CONFIG.get('browser-config', 'system_user_agent', fallback='').strip()
-    if len(accountAgent) >= 2 and ((accountAgent[0] == accountAgent[-1]) and accountAgent[0] in ("'", '"')):
-        accountAgent = accountAgent[1:-1].strip()
-
     # Fetch initial settings from API
     settings = apiClient.get_account_settings(account_id)
     if not settings:
@@ -165,7 +160,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
             if driver is None:
                 status_store.wait_vnc_ready()
                 try:
-                    driver = create_driver(account, accountAgent, account_idx=account_idx_for_port)
+                    driver = create_driver(account, account_idx=account_idx_for_port)
                     drivers[account] = driver
                     debug_line(client_log_line(account, "browser", "browser opened for session"))
                 except Exception as driver_error:

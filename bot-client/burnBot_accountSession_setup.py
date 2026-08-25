@@ -103,14 +103,17 @@ def launch_manual_browser(account):
 
     chrome_user_data_dir = build_user_data_dir(account)
     chrome_path = CONFIG.get('browser-config', 'chrome_path', fallback='/usr/bin/google-chrome')
+    chrome_path = resolve_chrome_binary(resolve_path(chrome_path)) or '/usr/bin/google-chrome'
 
     args = [
         chrome_path,
         f'--user-data-dir={chrome_user_data_dir}',
+        f'--profile-directory={account}',
         '--no-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-software-rasterizer',
+        '--use-gl=angle',
+        '--use-angle=swiftshader',
         '--disable-setuid-sandbox',
         '--window-size=1920,1080',
         '--window-position=0,0',
@@ -611,9 +614,11 @@ def connect_to_existing_chrome(account, chrome_user_data_dir, debug_port, chrome
         account: Account username/identifier
         chrome_user_data_dir: Path to Chrome user data directory
         debug_port: Remote debugging port number
-        chrome_version: Chrome version (default: 136) - Used to locate correct chromedriver
-        chrome_path: Path to Chrome executable (optional) - Not used for reconnection
-        
+        chrome_version: Chrome version (default: 136) - Log/diagnostics only
+        chrome_path: Resolved Chrome executable (optional). Not launched (the browser is
+            already running) but passed as binary_location so Selenium Manager fetches the
+            chromedriver matching *this* Chrome rather than the system one.
+
     Returns:
         webdriver.Chrome: Connected driver instance, or None if connection failed
         
@@ -647,9 +652,11 @@ def connect_to_existing_chrome(account, chrome_user_data_dir, debug_port, chrome
         else:
             debug_line(f"- [{account}]: Existing Chrome has {expected_window_count} window(s) (verified via DevTools API)")
         
-        # Create Chrome options with ONLY debuggerAddress
+        # Create Chrome options with ONLY debuggerAddress (+ binary_location for driver version matching)
         options = ChromeOptions()
         options.add_experimental_option("debuggerAddress", f"127.0.0.1:{debug_port}")
+        if chrome_path:
+            options.binary_location = chrome_path
         
         debug_line(f"- [{account}]: Connecting via Selenium with debuggerAddress: 127.0.0.1:{debug_port}")
         
@@ -697,7 +704,7 @@ def connect_to_existing_chrome(account, chrome_user_data_dir, debug_port, chrome
                     debug_line(f"- [{account}]: Window count matches! ({actual_window_count} windows)")
             
             debug_line(f"- [{account}]: Successfully reconnected to existing Chrome via Selenium")
-            debug_line(f"- [{account}]: Using reconnected Selenium driver (anti-detection not needed for existing session)")
+            debug_line(f"- [{account}]: Using reconnected Selenium driver (launch flags persist; nothing is injected post-launch)")
             
             return driver
             
@@ -754,8 +761,8 @@ def kill_chrome_processes_for_profile(chrome_user_data_dir, account, portable_ch
         try:
             portable_chrome_path = CONFIG['browser-config'].get('chrome_path', '').strip()
             if portable_chrome_path:
-                # Resolve path relative to project directory if specified
-                portable_chrome_path = resolve_path(portable_chrome_path)
+                # Resolve path relative to project directory, then to the real binary
+                portable_chrome_path = resolve_chrome_binary(resolve_path(portable_chrome_path))
             else:
                 # Empty means system Chrome - we can't reliably detect the path for killing processes
                 # So we'll skip this and just kill by user data dir
@@ -963,27 +970,13 @@ def update_profile_preferences(account, chrome_user_data_dir):
             prefs['profile']['user_name'] = account
             prefs['profile']['exit_type'] = 'Normal'
             prefs['profile']['exited_cleanly'] = True
-            
-            # Hide automation and DevTools protocol detection
-            # Remove webdriver indicator
-            if 'excludeSwitches' not in prefs:
-                prefs['excludeSwitches'] = ['enable-automation']
-            elif 'enable-automation' not in prefs.get('excludeSwitches', []):
-                prefs['excludeSwitches'].append('enable-automation')
-            
-            # Add preferences to hide automation
-            if 'prefs' not in prefs:
-                prefs['prefs'] = {}
-            
-            # Hide automation indicators in browser
-            if 'profile' not in prefs['prefs']:
-                prefs['prefs']['profile'] = {}
-            
-            # Disable automation indicator
-            prefs['prefs']['profile']['default_content_setting_values'] = {
-                'notifications': 2
-            }
-            
+
+            # Drop junk keys an earlier version wrote into Preferences. Neither is a
+            # real Chrome preference (excludeSwitches is a chromedriver capability),
+            # so they did nothing except mark the profile as bot-managed.
+            prefs.pop('excludeSwitches', None)
+            prefs.pop('prefs', None)
+
             # Write with timeout protection
             with open(preferences_file, 'w', encoding='utf-8') as f:
                 json.dump(prefs, f, indent=2)
@@ -1040,87 +1033,125 @@ def get_debugging_port(account_idx):
     return base_port + account_idx
 
 
-def normalize_user_agent(user_agent):
+def resolve_chrome_binary(chrome_path):
     """
-    Normalize a User-Agent string coming from config or external sources.
-    - Strips whitespace
-    - Removes optional surrounding quotes: "Mozilla/..." or 'Mozilla/...'
+    Resolve the configured chrome_path to the real Chrome executable.
+
+    - Empty/None → None (Selenium Manager picks the system Chrome).
+    - PortableApps layout: `<dir>/chrome.exe` is a small launcher that spawns the real
+      browser and exits — chromedriver reads that as "Chrome crashed". If
+      `<dir>/App/Chrome-bin/chrome.exe` exists, return that instead.
+    - Anything else is returned unchanged (e.g. /usr/bin/google-chrome exec's in place).
     """
-    if not user_agent:
-        return ""
-    ua = str(user_agent).strip()
-    if len(ua) >= 2 and ((ua[0] == ua[-1]) and ua[0] in ("'", '"')):
-        ua = ua[1:-1].strip()
-    return ua
+    if not chrome_path:
+        return None
+    chrome_path = str(chrome_path).strip()
+    if not chrome_path:
+        return None
+    real = os.path.join(os.path.dirname(os.path.abspath(chrome_path)), 'App', 'Chrome-bin', 'chrome.exe')
+    if os.path.isfile(real):
+        return real
+    return chrome_path
 
 
-def build_chrome_arguments(account, accountAgent, chrome_user_data_dir, base_arguments, debugging_port):
+def _major_version(text):
+    """'147.0.7727.101' → 147; None if unparseable."""
+    try:
+        return int(str(text).strip().split('.')[0])
+    except (ValueError, AttributeError):
+        return None
+
+
+def portable_chrome_major(chrome_binary):
+    """
+    Major version of a PortableApps Chrome from its App/Chrome-bin/<version>/ folder.
+    Returns None for anything that isn't that layout.
+    """
+    if not chrome_binary:
+        return None
+    bin_dir = os.path.dirname(os.path.abspath(chrome_binary))
+    if os.path.basename(bin_dir).lower() != 'chrome-bin':
+        return None
+    try:
+        versions = [_major_version(d) for d in os.listdir(bin_dir)
+                    if os.path.isdir(os.path.join(bin_dir, d)) and _major_version(d)]
+    except OSError:
+        return None
+    return max(versions) if versions else None
+
+
+def profile_last_major(chrome_user_data_dir):
+    """Major version of the Chrome that last opened this user-data-dir (its 'Last Version' file)."""
+    try:
+        with open(os.path.join(chrome_user_data_dir, 'Last Version'), encoding='utf-8') as fh:
+            return _major_version(fh.read())
+    except OSError:
+        return None
+
+
+def build_chrome_arguments(account, chrome_user_data_dir, base_arguments, debugging_port):
     """
     Build the final list of Chrome arguments.
-    
+
+    The browser's own User-Agent is never overridden: `--user-agent=` only rewrites the
+    UA header/string, not UA Client Hints or navigator.platform, so any override is
+    self-contradicting. Let Chrome identify as the Chrome it actually is.
+
     Args:
         account: Account username/identifier
-        accountAgent: User agent string (typically from local config; can be None/empty)
         chrome_user_data_dir: Path to Chrome user data directory
         base_arguments: List of base arguments from config file
         debugging_port: Remote debugging port number
-        
+
     Returns:
         list: Final list of Chrome argument strings
     """
     arguments = []
-    
-    # User agent (prefer explicit value, otherwise setup.system_user_agent, otherwise any --user-agent= in base args)
-    ua = normalize_user_agent(accountAgent)
-    if not ua:
-        ua = normalize_user_agent(CONFIG.get('browser-config', 'system_user_agent', fallback=''))
-    if ua:
-        arguments.append(f'--user-agent={ua}')
-    else:
-        for arg in base_arguments:
-            if arg.startswith('--user-agent='):
-                arguments.append(arg)
-                break
-    
+
     # User data dir and profile directory (account-specific, set dynamically)
     arguments.append(f'--user-data-dir={chrome_user_data_dir}')
     arguments.append(f'--profile-directory={account}')
-    
+
     # Add fixed remote debugging port (overrides config if set to 0)
     arguments.append(f'--remote-debugging-port={debugging_port}')
-    
+
     # Add other base arguments from config (excluding user-agent, user-data-dir, profile-directory, remote-debugging-port)
     for arg in base_arguments:
         if not any(arg.startswith(prefix) for prefix in ['--user-agent=', '--user-data-dir=', '--profile-directory=', '--remote-debugging-port=']):
             arguments.append(arg)
-    
+
     return arguments
 
 
-def setup_chrome_options(account, accountAgent, chrome_user_data_dir, debugging_port):
+def setup_chrome_options(account, chrome_user_data_dir, debugging_port, chrome_binary=None):
     """
     Setup Chrome options with all necessary arguments.
-    
+
     Args:
         account: Account username/identifier
-        accountAgent: User agent string (typically from local config; can be None/empty)
         chrome_user_data_dir: Path to Chrome user data directory
         debugging_port: Remote debugging port number
-        
+        chrome_binary: Resolved Chrome executable (see resolve_chrome_binary); None → system Chrome
+
     Returns:
         ChromeOptions: Configured Chrome options object
     """
     # Load base arguments from config file
     base_arguments = load_base_arguments()
-    
+
     # Build final arguments list
-    arguments = build_chrome_arguments(account, accountAgent, chrome_user_data_dir, base_arguments, debugging_port)
-    
+    arguments = build_chrome_arguments(account, chrome_user_data_dir, base_arguments, debugging_port)
+
     # Create and configure options
     options = ChromeOptions()
     for arg in arguments:
         options.add_argument(arg)
-    
+
+    # Launch the Chrome we configured (not whatever Selenium Manager finds on PATH).
+    # Selenium Manager reads the version from this binary and fetches the matching chromedriver.
+    if chrome_binary:
+        options.binary_location = chrome_binary
+
     # Headless + Linux/Docker flags
     system_type = CONFIG.get('bot_settings', 'system_type', fallback='windows')
     # Linux always runs headed into Xvfb via noVNC — headless config is ignored
@@ -1130,8 +1161,13 @@ def setup_chrome_options(account, accountAgent, chrome_user_data_dir, debugging_
     if system_type == 'linux':
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        # No GPU in a container. Chrome (M130+) will not fall back to software WebGL on
+        # its own in headed mode, so ask for ANGLE-on-SwiftShader explicitly — a desktop
+        # Chrome with no WebGL at all is a fingerprint. (Verified under Xvfb: with
+        # --disable-gpu alone, canvas.getContext('webgl') is null.)
         options.add_argument('--disable-gpu')
-        options.add_argument('--disable-software-rasterizer')
+        options.add_argument('--use-gl=angle')
+        options.add_argument('--use-angle=swiftshader')
         options.add_argument('--disable-setuid-sandbox')
         # Xvfb has no window manager, so driver.maximize_window() is a no-op and
         # Chrome opens small in the top-left. Size the window to the Xvfb display
@@ -1139,16 +1175,13 @@ def setup_chrome_options(account, accountAgent, chrome_user_data_dir, debugging_
         options.add_argument('--window-size=1920,1080')
         options.add_argument('--window-position=0,0')
 
-    # Add minimal stealth arguments - only the most critical ones
-    stealth_args = [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-infobars',
-    ]
-    for arg in stealth_args:
-        if arg not in arguments:
-            options.add_argument(arg)
-    
-    # Add experimental options for stealth
+    # Make navigator.webdriver read `false` — the value a normal Chrome reports.
+    # Nothing else is patched: injected JS shims (fake window.chrome, redefined
+    # navigator.webdriver, non-native permissions.query) are themselves detectable.
+    if '--disable-blink-features=AutomationControlled' not in arguments:
+        options.add_argument('--disable-blink-features=AutomationControlled')
+
+    # Keep chromedriver from advertising itself (--enable-automation switch / extension)
     options.add_experimental_option("excludeSwitches", [
         "enable-automation",  # Removes automation flag
         "enable-logging"  # Reduces logging
@@ -1178,21 +1211,18 @@ def setup_chrome_options(account, accountAgent, chrome_user_data_dir, debugging_
     for arg in additional_args:
         if arg not in [a for a in options.arguments]:
             options.add_argument(arg)
-    
-    # Note: CDP commands after driver creation will handle additional stealth measures
-    
+
     return options
 
 
-def create_driver(account, accountAgent, account_idx=0):
+def create_driver(account, account_idx=0):
     """
     Create and configure Chrome driver for an account.
     Handles all setup: user data dir, Local State, Preferences, Chrome options.
     Uses fixed remote debugging port based on account index for reliable reconnection.
-    
+
     Args:
         account: Account username/identifier
-        accountAgent: User agent string (typically from local config; can be None/empty)
         account_idx: Account index (0-based) for port assignment
         
     Returns:
@@ -1210,10 +1240,11 @@ def create_driver(account, accountAgent, account_idx=0):
     debug_line(f"- [{account}]: using remote debugging port: {debugging_port}")
     
     # Load configuration from [browser-config] and [browser-session] sections
-    # If chrome_path is empty, Selenium will use system Chrome
+    # If chrome_path is empty, Selenium will use system Chrome.
+    # Otherwise resolve it to the real executable (PortableApps launcher → App/Chrome-bin/chrome.exe).
     chrome_path = CONFIG['browser-config'].get('chrome_path', '').strip()
     if chrome_path:
-        chrome_path = resolve_path(chrome_path)
+        chrome_path = resolve_chrome_binary(resolve_path(chrome_path))
     else:
         chrome_path = None
     chrome_version = int(CONFIG['browser-config'].get('chrome_version', '143') or '143')
@@ -1257,7 +1288,20 @@ def create_driver(account, accountAgent, account_idx=0):
     
     # Build user data dir path per account
     chrome_user_data_dir = build_user_data_dir(account)
-    
+
+    # A profile that was last opened by a newer Chrome than the configured PortableChrome
+    # (typical for installs that ran on system Chrome before binary_location was honoured)
+    # would make Chrome refuse to start. Fall back to system Chrome rather than break.
+    _portable_major = portable_chrome_major(chrome_path)
+    _profile_major = profile_last_major(chrome_user_data_dir)
+    if _portable_major and _profile_major and _profile_major > _portable_major:
+        print(client_log_line(
+            account, "browser",
+            f"PortableChrome is v{_portable_major} but this profile was last opened by Chrome v{_profile_major} — "
+            f"using system Chrome instead (update PortableChrome or clear chrome_path to silence this)",
+        ))
+        chrome_path = None
+
     # Try to reconnect to existing Chrome instance first
     # Use the expected fixed port for this account
     is_running, debug_port = find_existing_chrome_process(chrome_user_data_dir, account, debugging_port)
@@ -1434,7 +1478,7 @@ def create_driver(account, accountAgent, account_idx=0):
             print(client_log_line(account, "browser", f"create chrome driver -attempt[{attempt + 1}/{max_retries}]"))
             
             # CRITICAL: Create fresh ChromeOptions for each attempt
-            options = setup_chrome_options(account, accountAgent, chrome_user_data_dir, debugging_port)
+            options = setup_chrome_options(account, chrome_user_data_dir, debugging_port, chrome_binary=chrome_path)
             
             # Verify the debugging port argument was set correctly (only on first attempt)
             if attempt == 0:
@@ -1917,92 +1961,21 @@ def create_driver(account, accountAgent, account_idx=0):
                 # Maximize might fail in headless/remote sessions, that's okay
                 pass
             
-            # Apply CDP stealth measures to hide automation indicators
-            # These commands make the browser appear more like a regular user browser
-            try:
-                # Comprehensive stealth script to hide WebDriver/automation
-                driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                    'source': '''
-                        // Minimal stealth - only fix what Selenium breaks
-                        Object.defineProperty(navigator, 'webdriver', {
-                            get: () => undefined,
-                        });
-                        
-                        // Remove from prototype chain
-                        delete Object.getPrototypeOf(navigator).webdriver;
-                        
-                        // Add chrome.runtime - must exist in Chrome browsers
-                        window.chrome = {
-                            runtime: {
-                                PlatformOs: {
-                                    MAC: 'mac',
-                                    WIN: 'win',
-                                    ANDROID: 'android',
-                                    CROS: 'cros',
-                                    LINUX: 'linux',
-                                    OPENBSD: 'openbsd'
-                                },
-                                PlatformArch: {
-                                    ARM: 'arm',
-                                    X86_32: 'x86-32',
-                                    X86_64: 'x86-64'
-                                },
-                                PlatformNaclArch: {
-                                    ARM: 'arm',
-                                    X86_32: 'x86-32',
-                                    X86_64: 'x86-64'
-                                },
-                                RequestUpdateCheckStatus: {
-                                    THROTTLED: 'throttled',
-                                    NO_UPDATE: 'no_update',
-                                    UPDATE_AVAILABLE: 'update_available'
-                                },
-                                OnInstalledReason: {
-                                    INSTALL: 'install',
-                                    UPDATE: 'update',
-                                    CHROME_UPDATE: 'chrome_update',
-                                    SHARED_MODULE_UPDATE: 'shared_module_update'
-                                },
-                                OnRestartRequiredReason: {
-                                    APP_UPDATE: 'app_update',
-                                    OS_UPDATE: 'os_update',
-                                    PERIODIC: 'periodic'
-                                },
-                                connect: function() {},
-                                sendMessage: function() {}
-                            },
-                            loadTimes: function() {},
-                            csi: function() {},
-                            app: {}
-                        };
-                        
-                        // Fix permissions query for notifications
-                        const originalQuery = window.navigator.permissions.query;
-                        window.navigator.permissions.query = (parameters) => (
-                            parameters.name === 'notifications' ?
-                                Promise.resolve({ state: 'default' }) :
-                                originalQuery(parameters)
-                        );
-                    '''
-                })
-                
-                debug_line(f"- [{account}]: Applied comprehensive stealth measures")
-            except Exception as cdp_error:
-                print(f"- [{account}]: Warning - Could not apply CDP stealth measures: {cdp_error}")
+            # Nothing is injected post-launch. Earlier versions patched navigator.webdriver,
+            # window.chrome and permissions.query here and forced Accept-Language/locale via
+            # CDP; those shims are themselves fingerprintable, and --lang + the
+            # intl.accept_languages pref already give an English UI and a native header.
 
-            # Force en-US locale and Accept-Language header via CDP so Meta's consent wall
-            # is rendered in English (matching our button-text selectors) and is less likely
-            # to appear for sessions that look like US-English browsers.
+            # Log what actually launched (real browser version, driver version, binary) —
+            # this is how version drift between the configured Chrome and the running one
+            # becomes visible per customer in the uploaded run log.
             try:
-                driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {
-                    'headers': {'Accept-Language': 'en-US,en;q=0.9'}
-                })
-                driver.execute_cdp_cmd('Emulation.setLocaleOverride', {
-                    'locale': 'en-US'
-                })
-                debug_line(f"- [{account}]: Applied locale/language override (en-US)")
-            except Exception as locale_error:
-                debug_line(f"- [{account}]: Warning - Could not apply locale override: {locale_error}")
+                _caps = driver.capabilities or {}
+                _bv = _caps.get('browserVersion') or '----'
+                _dv = ((_caps.get('chrome') or {}).get('chromedriverVersion') or '').split(' ')[0] or '----'
+                print(client_log_line(account, "browser", f"chrome:[{_bv}] / driver:[{_dv}] / binary:[{chrome_path or 'system'}]"))
+            except Exception as _cap_err:
+                debug_line(f"- [{account}]: Could not read browser capabilities: {_cap_err}")
 
             debug_line(f"- [{account}]: driver/browser created and verified")
             

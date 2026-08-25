@@ -56,12 +56,6 @@ def _default_config_path():
     return os.path.join(exe_dir, "burnBot_config.ini")
 
 
-_DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-)
-
-
 def _write_ini_from_activation(response: dict, config_path: str) -> None:
     """Write a burnBot_config.ini from the /bot/desktop/activate response.
 
@@ -87,12 +81,10 @@ def _write_ini_from_activation(response: dict, config_path: str) -> None:
             "chrome_version": "",
             "chrome_path": "/usr/bin/google-chrome",
             "chrome_user_data_dir_base": "ChromeUserData",
-            "system_user_agent": _DEFAULT_USER_AGENT,
             "add_argument": "",
         }
         cp["browser-session"] = {
             "headless": "False",
-            "detach": "False",
             "close_browser_after_session": "False",
             "close_browser_after_exit": "False",
             "bot_idle_delay": "0.25",
@@ -101,14 +93,14 @@ def _write_ini_from_activation(response: dict, config_path: str) -> None:
     else:
         cp["browser-config"] = {
             "chrome_version": "143",
-            "chrome_path": "PortableChrome\\chrome.exe",
+            # Empty → system-installed Google Chrome (auto-updating). Profiles still live
+            # under PortableChrome\user_<account>. Set to a chrome.exe path to override.
+            "chrome_path": "",
             "chrome_user_data_dir_base": "PortableChrome",
-            "system_user_agent": _DEFAULT_USER_AGENT,
             "add_argument": "",
         }
         cp["browser-session"] = {
             "headless": "False",
-            "detach": "False",
             "close_browser_after_session": "False",
             "close_browser_after_exit": "False",
             "bot_idle_delay": "0.25",
@@ -476,7 +468,6 @@ try:
         # Fetch user config and emit startup log
         # ------------------------------------------------------------------
         _plan = entitlement.get("plan_tier", "free")
-        _ua  = CONFIG.get('browser-config',  'system_user_agent',         fallback='').strip()
         _cs  = CONFIG.get('browser-session', 'close_browser_after_session', fallback='FALSE').strip().upper()
         _ce  = CONFIG.get('browser-session', 'close_browser_after_exit',    fallback='FALSE').strip().upper()
         _idl = str(bot_idle_delay_minutes).zfill(2)
@@ -520,9 +511,14 @@ try:
         _log(client_log_line("config", "login", f"skip_check:[{_skl_on}] / login_attempts:[{_lgt}]"))
         _log(client_log_line("config", "notify[session]", f"type:[{_ant}] / email:[{mask_email(_ane)}] / phone:[{mask_phone(_anp)}]"))
         _log(client_log_line("config", "notify[issues]", f"type:[{_ant}] / email:[{mask_email(_ane)}] / phone:[{mask_phone(_anp)}]"))
-        _ua_display = (_ua[:120] + "…") if len(_ua) > 120 else _ua
-        if _ua_display:
-            _log(client_log_line("config", "user_agent", f"[{_ua_display}]"))
+        # Effective timezone — Chrome reports this to sites via Intl; a UTC container
+        # under a Docker run that omitted `-v /etc/localtime:/etc/localtime:ro` is a mismatch.
+        _tz = datetime.now().astimezone()
+        _tz_name = _tz.tzname() or "unknown"
+        _tz_off = _tz.strftime("%z")
+        _log(client_log_line("config", "timezone", f"[{_tz_name}] / offset:[{_tz_off}]"))
+        if _st == "linux" and _tz_off in ("+0000", "-0000") and _tz_name.upper() in ("UTC", "GMT"):
+            _log(client_log_line("config", "timezone", "WARNING: container is on UTC — add `-v /etc/localtime:/etc/localtime:ro` to the docker run command so the browser reports your local timezone"))
         _log(client_log_line("config", "api", f"Subscription:[active] / plan:[{_plan}]"))
         _beep('startup')
         _start_vnc_services(pin=_vnc_pin)

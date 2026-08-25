@@ -8,12 +8,6 @@ CONFIG = configparser.ConfigParser()
 CONFIG_FILE_PATH = None
 
 
-_DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-)
-
-
 def _inject_missing_sections() -> None:
     """Ensure [browser-config] and [browser-session] exist.
 
@@ -31,14 +25,12 @@ def _inject_missing_sections() -> None:
             CONFIG.set("browser-config", "chrome_user_data_dir_base", "ChromeUserData")
         else:
             CONFIG.set("browser-config", "chrome_version", "143")
-            CONFIG.set("browser-config", "chrome_path", "PortableChrome\\chrome.exe")
+            CONFIG.set("browser-config", "chrome_path", "")  # empty → system Chrome
             CONFIG.set("browser-config", "chrome_user_data_dir_base", "PortableChrome")
-        CONFIG.set("browser-config", "system_user_agent", _DEFAULT_USER_AGENT)
         CONFIG.set("browser-config", "add_argument", "")
     if not CONFIG.has_section("browser-session"):
         CONFIG.add_section("browser-session")
         CONFIG.set("browser-session", "headless", "False")
-        CONFIG.set("browser-session", "detach", "False")
         CONFIG.set("browser-session", "close_browser_after_session", "False")
         CONFIG.set("browser-session", "close_browser_after_exit", "False")
         CONFIG.set("browser-session", "bot_idle_delay", "0.25")
