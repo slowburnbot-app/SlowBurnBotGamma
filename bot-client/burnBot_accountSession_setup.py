@@ -1021,15 +1021,25 @@ def load_base_arguments():
 def get_debugging_port(account_idx):
     """
     Get a fixed remote debugging port for an account based on its index.
-    Uses base port 9222 + account index to ensure unique ports per account.
-    
+    Uses base port (default 9222) + account index to ensure unique ports per account.
+
+    The base is configurable via [browser-config] debug_base_port so a machine where
+    9222+ is already taken (e.g. a netsh portproxy rule or another dev tool) can move
+    the whole range without a rebuild. Invalid/out-of-range values fall back to 9222.
+
     Args:
         account_idx: Account index (0-based)
-        
+
     Returns:
-        int: Port number (9222 + account_idx)
+        int: Port number (base_port + account_idx)
     """
     base_port = 9222
+    try:
+        configured = int(CONFIG.get('browser-config', 'debug_base_port', fallback='9222') or '9222')
+        if 1024 <= configured <= 65000:
+            base_port = configured
+    except (ValueError, TypeError):
+        pass
     return base_port + account_idx
 
 

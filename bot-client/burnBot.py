@@ -81,6 +81,7 @@ def _write_ini_from_activation(response: dict, config_path: str) -> None:
             "chrome_version": "",
             "chrome_path": "/usr/bin/google-chrome",
             "chrome_user_data_dir_base": "ChromeUserData",
+            "debug_base_port": "9222",
             "add_argument": "",
         }
         cp["browser-session"] = {
@@ -97,6 +98,9 @@ def _write_ini_from_activation(response: dict, config_path: str) -> None:
             # under PortableChrome\user_<account>. Set to a chrome.exe path to override.
             "chrome_path": "",
             "chrome_user_data_dir_base": "PortableChrome",
+            # Base remote-debugging port; each account uses base+index. Raise it if 9222+
+            # is taken on this machine (e.g. a netsh portproxy rule).
+            "debug_base_port": "9222",
             "add_argument": "",
         }
         cp["browser-session"] = {

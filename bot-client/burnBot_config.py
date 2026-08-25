@@ -27,6 +27,8 @@ def _inject_missing_sections() -> None:
             CONFIG.set("browser-config", "chrome_version", "143")
             CONFIG.set("browser-config", "chrome_path", "")  # empty → system Chrome
             CONFIG.set("browser-config", "chrome_user_data_dir_base", "PortableChrome")
+        if not CONFIG.has_option("browser-config", "debug_base_port"):
+            CONFIG.set("browser-config", "debug_base_port", "9222")
         CONFIG.set("browser-config", "add_argument", "")
     if not CONFIG.has_section("browser-session"):
         CONFIG.add_section("browser-session")
