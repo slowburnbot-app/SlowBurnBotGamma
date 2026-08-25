@@ -248,10 +248,79 @@ def dismiss_notifications_prompt(driver, context_label="login"):
     return False
 
 
-def enter_sms_code_in_browser(driver, code):
+# Instagram shows this interstitial ("Save your login info?") at /accounts/onetap/
+# immediately AFTER a successful login. Its presence is a positive login signal.
+INSTAGRAM_ONETAP_URL_FRAGMENT = "/accounts/onetap"
+
+# Markers that identify the logged-in viewer in page_source. Instagram serves the
+# username under different keys depending on the surface (feed vs. onetap shell), so
+# accept any of them. (Confirmed 2026-08-25: the onetap page carries "PolarisViewer"
+# with the username, not the "xdt_viewer" blob the feed uses.)
+_LOGGED_IN_USERNAME_MARKERS = (
+    '"xdt_viewer":{"user":{"username":"',
+    '"PolarisViewer"',
+)
+
+
+def dismiss_save_login_info(driver, context_label="login"):
+    """
+    Dismiss Instagram's 'Save your login info?' interstitial by clicking 'Not now'.
+    Safe no-op if the prompt is not present. Returns True if dismissed.
+    """
+    try:
+        page_source = driver.page_source.lower()
+    except Exception:
+        return False
+    if "save your login info" not in page_source and "save login info" not in page_source:
+        return False
+
+    debug_line(client_log_line(None, context_label, "'Save login info' prompt detected — looking for 'Not now'"))
+    not_now_selectors = [
+        (By.XPATH, "//button[contains(text(), 'Not now') or contains(text(), 'Not Now')]"),
+        (By.XPATH, "//div[contains(text(), 'Not now') or contains(text(), 'Not Now')]//ancestor::button"),
+        (By.XPATH, "//div[@role='button'][contains(normalize-space(string(.)), 'Not now') or contains(normalize-space(string(.)), 'Not Now')]"),
+    ]
+    for sel_type, sel_value in not_now_selectors:
+        try:
+            btn = WebDriverWait(driver, 6).until(EC.element_to_be_clickable((sel_type, sel_value)))
+            try:
+                btn.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", btn)
+            debug_line(client_log_line(None, context_label, "'Save login info' prompt dismissed"))
+            time.sleep(2.0)
+            return True
+        except Exception:
+            continue
+    debug_line(client_log_line(None, context_label, "'Save login info' prompt found but 'Not now' not clickable"))
+    return False
+
+
+def _extract_logged_in_username(page_source):
+    """Return the logged-in username from page_source, or None. Tries the feed's
+    xdt_viewer blob first, then any plausible "username":"..." occurrence."""
+    marker = '"xdt_viewer":{"user":{"username":"'
+    if marker in page_source:
+        start = page_source.find(marker) + len(marker)
+        end = page_source.find('"', start)
+        name = page_source[start:end]
+        if name:
+            return name
+    if '"username":"' in page_source:
+        for match in re.findall(r'"username":"([^"]+)"', page_source):
+            if len(match) > 3 and match.lower() not in ("sign up", "log in", "instagram"):
+                return match
+    return None
+
+
+def enter_sms_code_in_browser(driver, code, account=None):
     """
     Enter a verification/SMS code into the Instagram challenge form already visible in the browser.
     Returns (is_logged_in: bool, username: str | None, errors: str).
+
+    `account` is the handle we're logging in as; when login is confirmed only by the
+    post-login URL (the onetap shell doesn't always carry the viewer blob) it's used as
+    the returned username so the caller's `account == current_user` check passes.
     """
     moduleErrorsLog = ""
     try:
@@ -309,31 +378,46 @@ def enter_sms_code_in_browser(driver, code):
         if not submitted:
             code_input.send_keys(Keys.RETURN)
 
-        # Wait for page to process
+        # Wait for the code to be processed. A correct code leaves the challenge and
+        # lands on the "Save your login info?" interstitial (/accounts/onetap/) or the
+        # feed. The interstitial is a JS-rendered shell, so poll the URL / a viewer
+        # marker rather than trusting a fixed sleep + immediate page_source scrape
+        # (that early-scrape false-negative was the 2026-08-25 SMS-login bug).
+        def _looks_logged_in(d):
+            try:
+                if INSTAGRAM_ONETAP_URL_FRAGMENT in d.current_url:
+                    return True
+                src = d.page_source
+            except Exception:
+                return False
+            # Still on the code-entry form? keep waiting.
+            if "enter the code" in src.lower() or "verificationcode" in src.lower():
+                return False
+            return any(m in src for m in _LOGGED_IN_USERNAME_MARKERS)
+
         try:
-            WebDriverWait(driver, 25).until(
-                lambda d: d.execute_script("return document.readyState") == "complete"
-            )
+            WebDriverWait(driver, 25).until(_looks_logged_in)
         except Exception:
             pass
-        time.sleep(5)
+        time.sleep(2)
 
-        # Check if now logged in
+        # Dismiss the post-login interstitials so the account lands on the feed and the
+        # session persists. Both are safe no-ops when absent.
+        dismiss_save_login_info(driver, context_label="sms_login")
+        dismiss_notifications_prompt(driver, context_label="sms_login")
+
+        # Confirm: onetap URL alone proves login; otherwise scrape the viewer username.
+        try:
+            on_onetap = INSTAGRAM_ONETAP_URL_FRAGMENT in driver.current_url
+        except Exception:
+            on_onetap = False
         page_source = driver.page_source
-        if '"xdt_viewer":{"user":{"username":"' in page_source:
-            start = page_source.find('"xdt_viewer":{"user":{"username":"') + len(
-                '"xdt_viewer":{"user":{"username":"'
-            )
-            end = page_source.find('"', start)
-            username = page_source[start:end]
-            if username:
-                return True, username, moduleErrorsLog
-
-        if '"username":"' in page_source:
-            matches = re.findall(r'"username":"([^"]+)"', page_source)
-            for match in matches:
-                if len(match) > 3 and match.lower() not in ["sign up", "log in", "instagram"]:
-                    return True, match, moduleErrorsLog
+        username = _extract_logged_in_username(page_source)
+        if username:
+            return True, username, moduleErrorsLog
+        if on_onetap:
+            # Logged in (onetap only shows post-auth) but viewer blob not in this shell.
+            return True, account, moduleErrorsLog
 
         moduleErrorsLog += "Code submitted but login not confirmed"
         return False, None, moduleErrorsLog
@@ -1178,32 +1262,8 @@ def do_login(driver, username, password, apiClient=None):
             time.sleep(4.5)
             
             # Handle "Save login info" prompt if it appears after successful login
-            try:
-                page_source = driver.page_source.lower()
-                if "save your login info" in page_source or "save login info" in page_source:
-                    debug_line(f"-- DEBUG: 'Save login info' prompt detected, looking for 'Not now' button...")
-                    # Try to click "Not now" to skip saving login info
-                    not_now_selectors = [
-                        (By.XPATH, "//button[contains(text(), 'Not now') or contains(text(), 'Not Now')]"),
-                        (By.XPATH, "//div[contains(text(), 'Not now') or contains(text(), 'Not Now')]//ancestor::button"),
-                        (By.CSS_SELECTOR, "button._acan._acap._acas._aj1-")
-                    ]
-                    
-                    for selector_type, selector_value in not_now_selectors:
-                        try:
-                            not_now_button = WebDriverWait(driver, 6).until(
-                                EC.element_to_be_clickable((selector_type, selector_value))
-                            )
-                            not_now_button.click()
-                            debug_line(f"-- DEBUG: Clicked 'Not now' on save login info prompt")
-                            time.sleep(2.5)
-                            break
-                        except Exception:
-                            continue
-            except Exception as e:
-                debug_line(f"-- DEBUG: Error handling 'Save login info' prompt: {str(e)}")
-                pass  # Continue even if we can't dismiss this prompt
-            
+            dismiss_save_login_info(driver, context_label="do_login")
+
             # Handle notifications prompt if it appears
             dismiss_notifications_prompt(driver, context_label="do_login")
             
@@ -1476,7 +1536,7 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                 sms_code = status_store.request_operator_input(f"SMS code for @{account}:")
                 if sms_code.strip():
                     print(client_log_line(account, "login", "SMS code received — submitting to Instagram"))
-                    is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip())
+                    is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip(), account=account)
                     if not is_logged_in:
                         print(client_log_line(account, "login", f"SMS code entry failed: {loginErrors}"))
                         loginFailureExit = True
@@ -1515,7 +1575,7 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                     sms_code = status_store.request_operator_input(f"SMS code for @{account}:")
                     if sms_code.strip():
                         print(client_log_line(account, "login", "SMS code received — submitting to Instagram"))
-                        is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip())
+                        is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip(), account=account)
                         if not is_logged_in:
                             print(client_log_line(account, "login", f"SMS code entry failed: {loginErrors}"))
                             loginFailureExit = True
