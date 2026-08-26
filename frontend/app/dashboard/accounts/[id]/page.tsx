@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -122,6 +122,21 @@ export default function AccountDetailPage() {
   useEffect(() => {
     refreshSeeds();
   }, [refreshSeeds]);
+
+  // account group + topics: grow to show all text, and keep both boxes the same
+  // height (the taller one wins) whenever either value changes, including first load.
+  const groupRef = useRef<HTMLTextAreaElement>(null);
+  const topicsRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const a = groupRef.current;
+    const b = topicsRef.current;
+    if (!a || !b) return;
+    a.style.height = "auto";
+    b.style.height = "auto";
+    const h = Math.max(a.scrollHeight, b.scrollHeight) + 2; // + top/bottom border
+    a.style.height = `${h}px`;
+    b.style.height = `${h}px`;
+  }, [account, settings.account_group, settings.topics]); // `account` gates the textareas' first render
 
   useEffect(() => {
     getAccounts().then((list) => {
@@ -523,7 +538,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className={poolMode ? "opacity-40 transition-opacity" : "transition-opacity"}>
-                <textarea placeholder="comma-separated" rows={5}
+                <textarea ref={groupRef} placeholder="comma-separated" rows={5}
                   value={settings.account_group ?? ""}
                   onChange={(e) => setSettings((s) => ({ ...s, account_group: e.target.value || null }))}
                   className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
@@ -584,7 +599,7 @@ export default function AccountDetailPage() {
             </div>
             <div>
               <div className="text-base04 mb-1">instagram topics</div>
-              <textarea placeholder="comma-separated" rows={5}
+              <textarea ref={topicsRef} placeholder="comma-separated" rows={5}
                 value={settings.topics ?? ""}
                 onChange={(e) => setSettings((s) => ({ ...s, topics: e.target.value || null }))}
                 className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
