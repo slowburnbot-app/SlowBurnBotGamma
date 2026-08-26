@@ -22,6 +22,7 @@ from app.models.account import Account
 from app.models.account_settings import AccountSettings
 from app.models.activity_log import ActivityLog
 from app.models.desktop_build import DesktopBuild
+from app.models.follow_seed import FollowSeed
 from app.models.follow_target import FollowTarget
 from app.models.ignore_handle import IgnoreHandle
 from app.models.client_heartbeat import ClientHeartbeat
@@ -50,6 +51,8 @@ from app.schemas.bot import (
     SessionLogCreate,
 )
 from app.schemas.desktop_build import DesktopActivateRequest
+from app.schemas.follow_seed import BotFollowSeedCreate, BotFollowSeedUpdate, FollowSeedListRead, FollowSeedRead
+from app.services.follow_seeds import list_seeds, normalize_handle, seed_stats_by_handle, seed_to_dict
 from app.services.notifications import NotificationError, send_email, send_sms
 from app.settings import settings
 
@@ -548,3 +551,74 @@ async def activate_desktop_build(
         "api_url": settings.public_api_url,
         "build_options": build.build_options,
     }
+
+
+# ── follow seeds ──────────────────────────────────────────────────────────────
+
+
+@router.get("/seeds/{account_id}", response_model=FollowSeedListRead)
+async def get_bot_seeds(
+    account_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+    _: Subscription = Depends(require_active_subscription),
+):
+    """All seeds (retired included) with follow-back numbers. The bot picks from
+    the active ones and uses the full list to avoid re-discovering retired handles."""
+    await _assert_account_owned(account_id, user, session)
+    return await list_seeds(session, account_id)
+
+
+@router.post("/seeds", response_model=FollowSeedRead, status_code=status.HTTP_201_CREATED)
+async def create_bot_seed(
+    body: BotFollowSeedCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+    _: Subscription = Depends(require_active_subscription),
+):
+    """Bot-discovered seed (origin 'similar:<parent>'). Existing handles are returned as-is."""
+    await _assert_account_owned(body.account_id, user, session)
+    handle = normalize_handle(body.handle)
+    if not handle:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Handle is required.")
+    result = await session.execute(
+        select(FollowSeed).where(FollowSeed.account_id == body.account_id, FollowSeed.handle == handle)
+    )
+    seed = result.scalar_one_or_none()
+    if seed is None:
+        seed = FollowSeed(user_id=user.id, account_id=body.account_id, handle=handle, origin=body.origin, active=True)
+        session.add(seed)
+        await session.commit()
+        await session.refresh(seed)
+    stats, _ = await seed_stats_by_handle(session, body.account_id)
+    return seed_to_dict(seed, stats)
+
+
+@router.patch("/seeds/{seed_id}", response_model=FollowSeedRead)
+async def update_bot_seed(
+    seed_id: uuid.UUID,
+    body: BotFollowSeedUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+    _: Subscription = Depends(require_active_subscription),
+):
+    """Record a use (last_used_at / last_saturation) or retire a seed."""
+    result = await session.execute(
+        select(FollowSeed).where(FollowSeed.id == seed_id, FollowSeed.user_id == user.id)
+    )
+    seed = result.scalar_one_or_none()
+    if seed is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seed not found.")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is None:
+            continue
+        setattr(seed, field, value)
+    if body.active is False:
+        seed.retired_at = datetime.now(timezone.utc)
+    elif body.active is True:
+        seed.retired_at = None
+        seed.retire_reason = None
+    await session.commit()
+    await session.refresh(seed)
+    stats, _ = await seed_stats_by_handle(session, seed.account_id)
+    return seed_to_dict(seed, stats)

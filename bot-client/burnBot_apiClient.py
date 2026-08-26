@@ -517,6 +517,39 @@ class ApiClient:
             return None
 
     # ------------------------------------------------------------------
+    # Follow seeds (target accounts for follow[account list …] / follow[likers-accounts])
+    # ------------------------------------------------------------------
+
+    def get_seeds(self, account_id):
+        """Active seeds with their follow-back numbers.
+        Returns {"items": [...], "active_count": n, "account_rate": float|None}.
+        Raises on API failure so callers can fall back to the legacy account_group text."""
+        resp = self._request("GET", f"/bot/seeds/{account_id}")
+        return resp.json()
+
+    def create_seed(self, account_id, handle, origin="manual"):
+        payload = {"account_id": str(account_id), "handle": handle, "origin": origin}
+        try:
+            resp = self._request("POST", "/bot/seeds", json=payload)
+            return resp.json()
+        except Exception as e:
+            _log_api_err(e, "Failed to create follow seed")
+            return None
+
+    def update_seed(self, seed_id, **fields):
+        payload = {}
+        for key, value in fields.items():
+            if value is None:
+                continue
+            payload[key] = value.isoformat() if isinstance(value, datetime) else value
+        try:
+            resp = self._request("PATCH", f"/bot/seeds/{seed_id}", json=payload)
+            return resp.json()
+        except Exception as e:
+            _log_api_err(e, "Failed to update follow seed")
+            return None
+
+    # ------------------------------------------------------------------
     # Ignore list
     # ------------------------------------------------------------------
 

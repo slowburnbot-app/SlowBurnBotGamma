@@ -19,12 +19,15 @@ from app.models.account_settings import AccountSettings
 from app.models.activity_log import ActivityLog
 from app.models.client_heartbeat import ClientHeartbeat
 from app.models.desktop_build import DesktopBuild
+from app.models.follow_seed import FollowSeed
 from app.models.follow_target import FollowTarget
 from app.models.session_log import SessionLog
 from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.account import AccountCreate, AccountRead, AccountUpdate
 from app.schemas.account_settings import AccountSettingsRead, AccountSettingsUpdate
+from app.schemas.follow_seed import FollowSeedCreate, FollowSeedListRead, FollowSeedRead, FollowSeedUpdate
+from app.services.follow_seeds import list_seeds, normalize_handle, seed_stats_by_handle, seed_to_dict
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -789,3 +792,93 @@ async def get_account_activity_log(
             for lg in logs
         ],
     }
+
+
+# ── follow seeds ──────────────────────────────────────────────────────────────
+
+
+@router.get("/{account_id}/seeds", response_model=FollowSeedListRead)
+async def get_follow_seeds(
+    account_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    await _get_owned_account(account_id, user, session)
+    return await list_seeds(session, account_id)
+
+
+@router.post("/{account_id}/seeds", response_model=FollowSeedRead, status_code=status.HTTP_201_CREATED)
+async def add_follow_seed(
+    account_id: uuid.UUID,
+    body: FollowSeedCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Add a manual seed; re-adding a retired one reactivates it."""
+    await _get_owned_account(account_id, user, session)
+    handle = normalize_handle(body.handle)
+    if not handle:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Handle is required.")
+    result = await session.execute(
+        select(FollowSeed).where(FollowSeed.account_id == account_id, FollowSeed.handle == handle)
+    )
+    seed = result.scalar_one_or_none()
+    if seed is None:
+        seed = FollowSeed(user_id=user.id, account_id=account_id, handle=handle, origin="manual", active=True)
+        session.add(seed)
+    else:
+        seed.active = True
+        seed.retired_at = None
+        seed.retire_reason = None
+    await session.commit()
+    await session.refresh(seed)
+    stats, _ = await seed_stats_by_handle(session, account_id)
+    return seed_to_dict(seed, stats)
+
+
+@router.patch("/{account_id}/seeds/{seed_id}", response_model=FollowSeedRead)
+async def update_follow_seed(
+    account_id: uuid.UUID,
+    seed_id: uuid.UUID,
+    body: FollowSeedUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    await _get_owned_account(account_id, user, session)
+    result = await session.execute(
+        select(FollowSeed).where(FollowSeed.id == seed_id, FollowSeed.account_id == account_id)
+    )
+    seed = result.scalar_one_or_none()
+    if seed is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seed not found.")
+    if body.active is not None:
+        seed.active = body.active
+        if body.active:
+            seed.retired_at = None
+            seed.retire_reason = None
+        else:
+            seed.retired_at = datetime.now(timezone.utc)
+            seed.retire_reason = "disabled by user"
+    await session.commit()
+    await session.refresh(seed)
+    stats, _ = await seed_stats_by_handle(session, account_id)
+    return seed_to_dict(seed, stats)
+
+
+@router.delete("/{account_id}/seeds/{seed_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_follow_seed(
+    account_id: uuid.UUID,
+    seed_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    await _get_owned_account(account_id, user, session)
+    result = await session.execute(
+        select(FollowSeed).where(FollowSeed.id == seed_id, FollowSeed.account_id == account_id)
+    )
+    seed = result.scalar_one_or_none()
+    if seed is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seed not found.")
+    await session.delete(seed)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

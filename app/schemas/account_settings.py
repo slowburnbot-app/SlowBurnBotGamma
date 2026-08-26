@@ -25,6 +25,7 @@ class AccountSettingsUpdate(BaseModel):
     unfollow_days: int = 30
     list_tab: str | None = None
     account_group: str | None = None
+    account_group_mode: str = "manual"
     account_list_tab: str | None = None
     topics: str | None = None
 
@@ -46,6 +47,7 @@ class AccountSettingsRead(BaseModel):
     unfollow_days: int
     list_tab: str | None
     account_group: str | None
+    account_group_mode: str = "manual"
     account_list_tab: str | None
     topics: str | None
     updated_at: datetime

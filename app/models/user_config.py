@@ -28,6 +28,12 @@ class UserConfig(Base):
 
     # Follow settings
     skip_private: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Candidate filters read off the profile hover card before a follow (0 = rule off):
+    # skip accounts with more than max_followers, require following/followers >=
+    # min_follow_ratio_pct percent, require at least min_posts posts.
+    max_followers: Mapped[int] = mapped_column(Integer, default=5000)
+    min_follow_ratio_pct: Mapped[int] = mapped_column(Integer, default=50)
+    min_posts: Mapped[int] = mapped_column(Integer, default=1)
 
     # Notification settings
     notices_type: Mapped[str] = mapped_column(String(10), default="email")  # text/email/both/none

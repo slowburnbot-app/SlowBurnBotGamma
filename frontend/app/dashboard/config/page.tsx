@@ -51,6 +51,9 @@ export default function ConfigPage() {
 
   // Ignore list
   const [skipPrivate, setSkipPrivate] = useState(false);
+  const [maxFollowers, setMaxFollowers] = useState(5000);
+  const [minFollowRatioPct, setMinFollowRatioPct] = useState(50);
+  const [minPosts, setMinPosts] = useState(1);
   const [ignoreHandles, setIgnoreHandles] = useState("");
 
   useEffect(() => {
@@ -69,6 +72,9 @@ export default function ConfigPage() {
         setLoginNotifyEmail(c.login_notify_email ?? "");
         setLoginNotifyPhone(c.login_notify_phone ?? "");
         setSkipPrivate(c.skip_private);
+        setMaxFollowers(c.max_followers);
+        setMinFollowRatioPct(c.min_follow_ratio_pct);
+        setMinPosts(c.min_posts);
         setNotifyEmail(c.notify_email ?? "");
         setNotifyPhone(c.notify_phone ?? "");
       })
@@ -95,6 +101,9 @@ export default function ConfigPage() {
         login_notify_email: loginNotifyEmail || null,
         login_notify_phone: loginNotifyPhone || null,
         skip_private: skipPrivate,
+        max_followers: maxFollowers,
+        min_follow_ratio_pct: minFollowRatioPct,
+        min_posts: minPosts,
         notify_email: notifyEmail || null,
         notify_phone: notifyPhone || null,
       });
@@ -173,6 +182,28 @@ export default function ConfigPage() {
 
         <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
           <BracketCheckbox label="Skip Private Accounts" checked={skipPrivate} onChange={setSkipPrivate} />
+        </div>
+
+        <div className="px-4 py-3 border-t border-base03 flex items-center gap-x-5 gap-y-2 flex-wrap">
+          <span className="text-base04">follow filters (0 = off):</span>
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"max followers: "}</span>
+            <span className="text-base05">{"["}</span>
+            <NumberInput value={maxFollowers} onChange={setMaxFollowers} placeholder="0" max={9999999} maxLength={7} />
+            <span className="text-base05">{"]"}</span>
+          </span>
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"min following/followers %: "}</span>
+            <span className="text-base05">{"["}</span>
+            <NumberInput value={minFollowRatioPct} onChange={setMinFollowRatioPct} placeholder="0" max={999} maxLength={3} />
+            <span className="text-base05">{"]"}</span>
+          </span>
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"min posts: "}</span>
+            <span className="text-base05">{"["}</span>
+            <NumberInput value={minPosts} onChange={setMinPosts} placeholder="0" max={999} maxLength={3} />
+            <span className="text-base05">{"]"}</span>
+          </span>
         </div>
 
         <div className="px-4 py-3 border-t border-base03">

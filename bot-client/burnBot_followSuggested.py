@@ -10,6 +10,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 import burnBot_status as status_store
 from burnBot_client_log import client_log_line
+from burnBot_followFilter import load_known_handles, screen_candidate
 
 _p = _builtins.print  # set per-call by do_follow_suggested; safe because sessions run sequentially
 
@@ -55,20 +56,24 @@ def _extract_username_from_profile_href(href: str) -> str | None:
         return None
 
 
-def _find_home_follow_candidates(driver, max_candidates: int = 50):
+def _find_home_follow_candidates(driver, max_candidates: int = 50, root=None):
     """
     Find follow candidates on Instagram home page by locating Follow buttons and
     extracting the associated username from nearby profile links.
+
+    root: optional WebElement to search within (e.g. an open likers dialog)
+          instead of the whole document.
 
     Returns: list[tuple[str, WebElement, WebElement|None]]
       - (username, follow_button_element, username_anchor_element_or_None)
     """
     # Instagram UI varies: buttons can be <button> or <div role="button">
-    follow_buttons = driver.find_elements(
+    prefix = ".//" if root is not None else "//"
+    follow_buttons = (root if root is not None else driver).find_elements(
         By.XPATH,
         (
-            "//button[normalize-space()='Follow' or normalize-space()='Follow back']"
-            " | //*[@role='button'][normalize-space()='Follow' or normalize-space()='Follow back']"
+            f"{prefix}button[normalize-space()='Follow' or normalize-space()='Follow back']"
+            f" | {prefix}*[@role='button'][normalize-space()='Follow' or normalize-space()='Follow back']"
         ),
     )
 
@@ -158,21 +163,8 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
         today = date.today()
         follow_date = today
 
-        # Load database of previously followed accounts from API
-        try:
-            database_names = list(apiClient.get_all_follow_target_handles(account_id))
-        except Exception as e:
-            _p(client_log_line(account, _scope, f"{_lbl}Warning: Could not load follow targets: {e}"))
-            database_names = []
-
-        # Add universal ignore list
-        try:
-            ignore_list = apiClient.get_ignore_handles()
-            database_names.extend(ignore_list)
-        except Exception as e:
-            _p(client_log_line(account, _scope, f"{_lbl}Warning: Could not load ignore list: {e}"))
-
-        _p(client_log_line(account, _scope, f"{_lbl}loaded {len(database_names)} existing entries"))
+        # Previously followed / skipped handles + universal ignore list (case-insensitive)
+        database_names = load_known_handles(apiClient, account_id, account, _scope, _lbl, _p)
 
         # ------------------------------------------------------------------
         # Phase A (primary): Explore People
@@ -217,31 +209,12 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                         _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [in database]"))
                         continue
 
-                    # Hover over username anchor to trigger preview (optional)
-                    if user_name_anchor is not None:
-                        try:
-                            actions = ActionChains(driver)
-                            actions.move_to_element(user_name_anchor)
-                            actions.perform()
-                            hsleep(1, 3)
-                        except Exception:
-                            pass
-
-                    page = driver.page_source or ""
-                    if ("The account is private" in page) or ("This Account is Private" in page):
-                        user_config = apiClient.get_user_config() if apiClient else None
-                        if user_config and user_config.get('skip_private', False):
-                            _create_follow_entry(
-                                apiClient, account_id,
-                                user_name=user_name,
-                                source="suggested[accounts]",
-                                status="private",
-                                follow_date=follow_date,
-                            )
-                            database_names.append(user_name)
-                            _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [private]"))
-                            continue
-                        _p(client_log_line(account, _scope, f"{_lbl}private @{user_name}"))
+                    # Hover + hover-card filters (private / too big / low ratio / no posts)
+                    if not screen_candidate(
+                        driver, apiClient, account_id, account, _scope, _lbl, "suggested[accounts]",
+                        user_name, user_name_anchor, database_names, follow_date, _p,
+                    ):
+                        continue
 
                     # Click follow
                     click_success = False
@@ -263,7 +236,7 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                         continue
 
                     followed_count += 1
-                    database_names.append(user_name)
+                    database_names.add(user_name)
 
                     _create_follow_entry(
                         apiClient, account_id,
@@ -342,61 +315,36 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                             _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [{user_status.lower()}]"))
                             continue
 
-                        # Hover over username to trigger profile preview
-                        actions = ActionChains(driver)
-                        actions.move_to_element(user_name_element)
-                        actions.perform()
-                        hsleep(1, 3)
+                        # Hover + hover-card filters (private / too big / low ratio / no posts)
+                        if not screen_candidate(
+                            driver, apiClient, account_id, account, _scope, _lbl, "suggested[accounts]",
+                            user_name, user_name_element, database_names, follow_date, _p,
+                        ):
+                            continue
 
                         # Check for stale element
                         if not user_name_element.text:
                             continue
 
-                        # Check if account is private
-                        _is_private = "The account is private" in driver.page_source
-                        _skip_private = False
-                        if _is_private:
-                            user_config = apiClient.get_user_config() if apiClient else None
-                            _skip_private = bool(user_config and user_config.get('skip_private', False))
-                        if _is_private and _skip_private:
-                            # Move away from hover
-                            profile_link = driver.find_element(By.PARTIAL_LINK_TEXT, "Profile")
-                            actions = ActionChains(driver)
-                            actions.move_to_element(profile_link)
-                            actions.perform()
+                        # Follow the account
+                        followed_count += 1
 
-                            # Log private account via API
-                            _create_follow_entry(
-                                apiClient, account_id,
-                                user_name=user_name,
-                                source="suggested[accounts]",
-                                status="private",
-                                follow_date=follow_date,
-                            )
-                            database_names.append(user_name)
+                        hclick(driver, user_status_element)
 
-                            _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [private]"))
+                        # Log followed account via API
+                        _create_follow_entry(
+                            apiClient, account_id,
+                            user_name=user_name,
+                            source="suggested[accounts]",
+                            status="following",
+                            follow_date=follow_date,
+                        )
+                        database_names.add(user_name)
 
-                        else:
-                            # Follow the account
-                            followed_count += 1
+                        _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
 
-                            hclick(driver, user_status_element)
-
-                            # Log followed account via API
-                            _create_follow_entry(
-                                apiClient, account_id,
-                                user_name=user_name,
-                                source="suggested[accounts]",
-                                status="following",
-                                follow_date=follow_date,
-                            )
-                            database_names.append(user_name)
-
-                            _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
-
-                            # Delay between follows
-                            hsleep(10, 20)
+                        # Delay between follows
+                        hsleep(10, 20)
 
                     except StaleElementReferenceException:
                         continue
@@ -432,56 +380,37 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                             _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [in database]"))
                             continue
 
-                        if user_name_anchor is not None:
-                            try:
-                                actions = ActionChains(driver)
-                                actions.move_to_element(user_name_anchor)
-                                actions.perform()
-                                hsleep(1, 3)
-                            except Exception:
-                                pass
+                        # Hover + hover-card filters (private / too big / low ratio / no posts)
+                        if not screen_candidate(
+                            driver, apiClient, account_id, account, _scope, _lbl, "suggested[accounts]",
+                            user_name, user_name_anchor, database_names, follow_date, _p,
+                        ):
+                            continue
 
-                        page = driver.page_source or ""
-                        _is_private = ("The account is private" in page) or ("This Account is Private" in page)
-                        _skip_private = False
-                        if _is_private:
-                            user_config = apiClient.get_user_config() if apiClient else None
-                            _skip_private = bool(user_config and user_config.get('skip_private', False))
-                        if _is_private and _skip_private:
-                            _create_follow_entry(
-                                apiClient, account_id,
-                                user_name=user_name,
-                                source="suggested[accounts]",
-                                status="private",
-                                follow_date=follow_date,
-                            )
-                            database_names.append(user_name)
-                            _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [private]"))
-                        else:
-                            followed_count += 1
+                        followed_count += 1
 
+                        try:
+                            hclick(driver, follow_button)
+                        except Exception:
                             try:
-                                hclick(driver, follow_button)
+                                follow_button.click()
                             except Exception:
                                 try:
-                                    follow_button.click()
+                                    driver.execute_script("arguments[0].click();", follow_button)
                                 except Exception:
-                                    try:
-                                        driver.execute_script("arguments[0].click();", follow_button)
-                                    except Exception:
-                                        followed_count -= 1
-                                        continue
+                                    followed_count -= 1
+                                    continue
 
-                            _create_follow_entry(
-                                apiClient, account_id,
-                                user_name=user_name,
-                                source="suggested[accounts]",
-                                status="following",
-                                follow_date=follow_date,
-                            )
-                            database_names.append(user_name)
-                            _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
-                            hsleep(10, 20)
+                        _create_follow_entry(
+                            apiClient, account_id,
+                            user_name=user_name,
+                            source="suggested[accounts]",
+                            status="following",
+                            follow_date=follow_date,
+                        )
+                        database_names.add(user_name)
+                        _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
+                        hsleep(10, 20)
 
                     except StaleElementReferenceException:
                         continue

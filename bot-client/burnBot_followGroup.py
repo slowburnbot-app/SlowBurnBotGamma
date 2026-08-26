@@ -13,6 +13,8 @@ from burnBot_utils import process_exception
 from burnBot_client_log import client_log_line
 from burnBot_run_log import debug_line
 from burnBot_followSuggested import _find_home_follow_candidates
+from burnBot_followFilter import load_known_handles, screen_candidate
+from burnBot_seeds import load_seed_pool, pick_seed, finish_seed_use, maybe_discover_seeds
 import burnBot_status as status_store
 
 _p = _builtins.print  # set per-call by do_follow_group; safe because sessions run sequentially
@@ -32,14 +34,23 @@ _SIMILAR_CHEVRON_CSS = "svg[aria-label='Similar accounts']"
 _SIMILAR_NEXT_XPATH = "//button[@aria-label='Next'] | //*[@role='button'][@aria-label='Next']"
 
 
+def _saturation_pct(skip_already, skip_private, followed_count):
+    """% of processed entries that could never produce a follow from this pool
+    (already known); None when nothing was processed."""
+    processed = skip_already + skip_private + followed_count
+    if processed <= 0:
+        return None
+    return round(skip_already / processed * 100)
+
+
 def _saturation_warning(account, scope, lbl, action_label, target_account, skip_already, skip_private, followed_count):
     """Saturation check: how much of the target's pool was un-followable.
     Prints the warning/debug line and returns the text to append to the module warnings log."""
     processed = skip_already + skip_private + followed_count
-    if processed <= 0:
+    pct = _saturation_pct(skip_already, skip_private, followed_count)
+    if pct is None:
         return ""
-    saturation = skip_already / processed
-    pct = round(saturation * 100)
+    saturation = pct / 100
     if processed >= _SATURATION_MIN_ENTRIES and saturation >= _SATURATION_WARN_RATIO:
         _p(client_log_line(account, scope, f"{lbl}Warning: [{target_account}] {pct}% saturated ({skip_already} of {processed} entries already followed) - consider rotating target accounts"))
         return f"{action_label or 'follow[group]'}: [{target_account}] {pct}% saturated ({skip_already}/{processed} already followed) - rotate targets\n"
@@ -143,38 +154,21 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
 
             try:
                 if user_name in database_names:
-                    skip_already += 1
+                    if database_names.is_skipped(user_name):
+                        skip_private += 1   # filtered on an earlier run — a config choice, not exhaustion
+                    else:
+                        skip_already += 1
                     _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [in database]"))
                     hsleep(1, 1)
                     continue
 
-                # Hover the username to trigger the profile preview (surfaces the private notice)
-                if user_name_anchor is not None:
-                    try:
-                        actions = ActionChains(driver)
-                        actions.move_to_element(user_name_anchor)
-                        actions.perform()
-                        hsleep(1, 2)
-                    except Exception:
-                        pass
-
-                page = driver.page_source or ""
-                _is_private = ("The account is private" in page) or ("This Account is Private" in page)
-                _skip_private = False
-                if _is_private:
-                    user_config = apiClient.get_user_config() if apiClient else None
-                    _skip_private = bool(user_config and user_config.get('skip_private', False))
-                if _is_private and _skip_private:
-                    try:
-                        apiClient.create_follow_target(
-                            account_id, user_name, source=f"{target_account}[{action_type}]",
-                            status="private", follow_date=follow_date,
-                        )
-                    except Exception:
-                        pass
-                    database_names.append(user_name)
+                # Hover + hover-card filters (private / too big / low ratio / no posts)
+                if not screen_candidate(
+                    driver, apiClient, account_id, account, scope, f"{target_account}[{action_type}]-",
+                    f"{target_account}[{action_type}]", user_name, user_name_anchor,
+                    database_names, follow_date, _p,
+                ):
                     skip_private += 1
-                    _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [private]"))
                     continue
 
                 try:
@@ -183,7 +177,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
                     driver.execute_script("arguments[0].click();", follow_button)
 
                 followed_count += 1
-                database_names.append(user_name)
+                database_names.add(user_name)
                 try:
                     apiClient.create_follow_target(
                         account_id, user_name, source=f"{target_account}[{action_type}]",
@@ -208,7 +202,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
     return followed_count, skip_already, skip_private, module_errors_log
 
 
-def do_follow_group(driver, account, target_count, apiClient, account_id, group_type, target_accounts, _print=None, log_scope=None, action_label=None):
+def do_follow_group(driver, account, target_count, apiClient, account_id, group_type, target_accounts, group_mode="manual", _print=None, log_scope=None, action_label=None):
     global _p
     _p = _print if _print is not None else _builtins.print
     _scope = log_scope or "follow-group"
@@ -224,7 +218,9 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         apiClient: ApiClient instance for API access
         account_id: Account UUID
         group_type: "followers[group]" or "following[group]"
-        target_accounts: Comma-separated list of target account usernames
+        target_accounts: Comma-separated list of target account usernames (the account group)
+        group_mode: "manual" — pick from target_accounts at random (original behaviour)
+                    "pool"   — pick from the follow_seeds pool (weighted, self-managing)
 
     Returns:
         tuple: (followed_count, error_log_string, warning_log_string)
@@ -237,29 +233,19 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         today = date.today()
         follow_date = today
 
-        # Load database of previously followed accounts from API
-        try:
-            database_names = list(apiClient.get_all_follow_target_handles(account_id))
-        except Exception as e:
-            _p(client_log_line(account, _scope, f"{_lbl}Warning: Could not load follow targets: {e}"))
-            database_names = []
+        # Previously followed / skipped handles + universal ignore list (case-insensitive)
+        database_names = load_known_handles(apiClient, account_id, account, _scope, _lbl, _p)
 
-        # Add universal ignore list
-        try:
-            ignore_list = apiClient.get_ignore_handles()
-            database_names.extend(ignore_list)
-        except Exception as e:
-            _p(client_log_line(account, _scope, f"{_lbl}Warning: Could not load ignore list: {e}"))
-
-        _p(client_log_line(account, _scope, f"{_lbl}loaded {len(database_names)} existing entries"))
-        
-        # Parse target accounts and randomly select one
-        target_accounts_list = [t.strip() for t in target_accounts.split(',') if t.strip()]
-        if not target_accounts_list:
+        # Target pool: the manual account-group list, or the self-managing seed pool
+        seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(apiClient, account_id, target_accounts, group_mode)
+        if group_mode == "pool":
+            maybe_discover_seeds(driver, apiClient, account_id, account, seed_pool, all_seeds, group_handles, _scope, _lbl, _p)
+        seed = pick_seed(seed_pool)
+        if seed is None:
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: No target accounts provided"))
-            return 0, "No target accounts provided"
-        
-        target_account = random.choice(target_accounts_list)
+            return 0, "No target accounts provided", ""
+
+        target_account = seed["handle"]
         _p(client_log_line(account, _scope, f"{_lbl}selected target: {target_account}"))
         
         # Navigate to target account page
@@ -272,7 +258,8 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         if driver.find_elements(By.XPATH, "//*[contains(text(), \"Sorry, this page isn't available.\")]"):
             error_msg = f"Target account '{target_account}' not found"
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: {error_msg}"))
-            return 0, error_msg
+            finish_seed_use(apiClient, seed, None, account_rate, account, _scope, _lbl, _p, retire_reason="not found")
+            return 0, error_msg, ""
         
         # Similar accounts: no followers/following dialog — a carousel off the profile header.
         if group_type == "account list [similar]":
@@ -289,6 +276,10 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
             module_warnings_log += _saturation_warning(
                 account, _scope, _lbl, action_label, target_account, skip_already, skip_private, followed_count,
             )
+            finish_seed_use(
+                apiClient, seed, _saturation_pct(skip_already, skip_private, followed_count),
+                account_rate, account, _scope, _lbl, _p,
+            )
             return followed_count, module_errors_log, module_warnings_log
 
         # Determine which link to click (followers or following)
@@ -300,7 +291,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
             action_type = "following"
         else:
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: Invalid group type"))
-            return 0, f"Invalid group type: {group_type}"
+            return 0, f"Invalid group type: {group_type}", ""
         
         # Find and click the followers/following link — try multiple strategies since
         # Instagram changes whether these are <a href=…>, <button>, or role="link" elements.
@@ -329,7 +320,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         if target_link is None:
             error_msg = f"Failed to open {link_text} dialog: element not found with any selector strategy"
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: {error_msg}"))
-            return 0, error_msg
+            return 0, error_msg, ""
 
         _p(client_log_line(account, _scope, f"{_lbl}located {link_text} via [{matched_strategy}]"))
         try:
@@ -345,7 +336,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         except Exception as e:
             error_msg = f"Failed to open {link_text} dialog: {e}"
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: {error_msg}"))
-            return 0, error_msg
+            return 0, error_msg, ""
         
         _p(client_log_line(account, _scope, f"{_lbl}dialog opened for {target_account}"))
         
@@ -368,7 +359,11 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
 
         while followed_count < target_count:
             if status_store.is_bot_paused():
-                return followed_count, module_errors_log
+                finish_seed_use(
+                    apiClient, seed, _saturation_pct(skip_already, skip_private, followed_count),
+                    account_rate, account, _scope, _lbl, _p,
+                )
+                return followed_count, module_errors_log, module_warnings_log
             _scan_heartbeat()
             try:
                 # Find all user boxes in the dialog
@@ -422,7 +417,10 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                 try:
                     # Check if already in database
                     if user_name in database_names:
-                        skip_already += 1
+                        if database_names.is_skipped(user_name):
+                            skip_private += 1   # filtered on an earlier run — a config choice, not exhaustion
+                        else:
+                            skip_already += 1
                         _p(client_log_line(account, _scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [in database]"))
                         hsleep(1, 1)
                         continue
@@ -434,61 +432,39 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                         hsleep(1, 1)
                         continue
                     
-                    # Hover over username to trigger profile preview
-                    actions = ActionChains(driver)
-                    actions.move_to_element(user_name_element)
-                    actions.perform()
-                    hsleep(1, 1)
-                    
+                    # Hover + hover-card filters (private / too big / low ratio / no posts)
+                    target_source = f"{target_account}[{action_type}]"
+                    if not screen_candidate(
+                        driver, apiClient, account_id, account, _scope, f"{target_source}-",
+                        target_source, user_name, user_name_element,
+                        database_names, follow_date, _p,
+                    ):
+                        skip_private += 1
+                        continue
+
                     # Check for stale element
                     if not user_name_element.text:
                         continue
-                    
-                    # Check if account is private
-                    _is_private = 'The account is private' in driver.page_source
-                    _skip_private = False
-                    if _is_private:
-                        user_config = apiClient.get_user_config() if apiClient else None
-                        _skip_private = bool(user_config and user_config.get('skip_private', False))
-                    if _is_private and _skip_private:
-                        # Log private account via API
-                        target_source = f"{target_account}[{action_type}]"
-                        try:
-                            apiClient.create_follow_target(
-                                account_id, user_name, source=target_source,
-                                status="private", follow_date=follow_date
-                            )
-                        except Exception:
-                            pass
 
-                        # Move hover away
-                        actions = ActionChains(driver)
-                        actions.move_to_element(target_link)
-                        actions.perform()
+                    # Follow the account
+                    followed_count += 1
 
-                        skip_private += 1
-                        _p(client_log_line(account, _scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [private]"))
+                    hclick(driver, user_status_element)
 
-                    else:
-                        # Follow the account
-                        followed_count += 1
+                    # Log followed account via API
+                    try:
+                        apiClient.create_follow_target(
+                            account_id, user_name, source=target_source,
+                            status="following", follow_date=follow_date
+                        )
+                    except Exception:
+                        pass
+                    database_names.add(user_name)
 
-                        hclick(driver, user_status_element)
+                    _p(client_log_line(account, _scope, f"{target_source}-[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
 
-                        # Log followed account via API
-                        target_source = f"{target_account}[{action_type}]"
-                        try:
-                            apiClient.create_follow_target(
-                                account_id, user_name, source=target_source,
-                                status="following", follow_date=follow_date
-                            )
-                        except Exception:
-                            pass
-
-                        _p(client_log_line(account, _scope, f"{target_account}[{action_type}]-[{followed_count:02d}/{target_count:02d}] - [{user_name}]"))
-                        
-                        # Delay between follows
-                        hsleep(10, 20)
+                    # Delay between follows
+                    hsleep(10, 20)
                 
                 except StaleElementReferenceException:
                     continue
@@ -527,6 +503,10 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
 
         module_warnings_log += _saturation_warning(
             account, _scope, _lbl, action_label, target_account, skip_already, skip_private, followed_count,
+        )
+        finish_seed_use(
+            apiClient, seed, _saturation_pct(skip_already, skip_private, followed_count),
+            account_rate, account, _scope, _lbl, _p,
         )
 
     except Exception as e:

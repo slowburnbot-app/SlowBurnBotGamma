@@ -44,6 +44,11 @@ class AccountSettings(Base):
     unfollow_days: Mapped[int] = mapped_column(Integer, default=30)
     list_tab: Mapped[str | None] = mapped_column(String(150), nullable=True)
     account_group: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Where "account list …" / "post engagers [account list]" take their targets from:
+    #   manual — the account_group text above, random pick (the original behaviour)
+    #   pool   — the follow_seeds table: follow-back-weighted pick, auto-retire,
+    #            auto-discovery (bootstrapped from account_group when the pool is empty)
+    account_group_mode: Mapped[str] = mapped_column(String(10), default="manual")
     account_list_tab: Mapped[str | None] = mapped_column(String(150), nullable=True)
     topics: Mapped[str | None] = mapped_column(String(500), nullable=True)
 

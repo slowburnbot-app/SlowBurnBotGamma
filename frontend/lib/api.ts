@@ -269,6 +269,44 @@ export interface SourceStat {
   rate: number | null;
 }
 
+export interface FollowSeed {
+  id: string;
+  handle: string;
+  origin: string;
+  active: boolean;
+  added_at: string;
+  retired_at: string | null;
+  retire_reason: string | null;
+  last_used_at: string | null;
+  last_saturation: number | null;
+  total: number;
+  complete: number;
+  followed_back: number;
+  rate: number | null;
+}
+
+export interface FollowSeedList {
+  items: FollowSeed[];
+  active_count: number;
+  account_rate: number | null;
+}
+
+export async function getFollowSeeds(id: string) {
+  return request<FollowSeedList>(`/accounts/${id}/seeds`);
+}
+
+export async function addFollowSeed(id: string, handle: string) {
+  return request<FollowSeed>(`/accounts/${id}/seeds`, { method: "POST", body: JSON.stringify({ handle }) });
+}
+
+export async function updateFollowSeed(id: string, seedId: string, data: { active?: boolean }) {
+  return request<FollowSeed>(`/accounts/${id}/seeds/${seedId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteFollowSeed(id: string, seedId: string) {
+  return request<void>(`/accounts/${id}/seeds/${seedId}`, { method: "DELETE" });
+}
+
 export async function getAccountSourceStats(id: string, period: string = "week") {
   return request<{ days: number; items: SourceStat[] }>(
     `/accounts/${id}/source-stats?period=${period}&client_date=${localDateParam()}`
@@ -397,6 +435,7 @@ export interface AccountSettings {
   unfollow_days: number;
   list_tab: string | null;
   account_group: string | null;
+  account_group_mode: string;
   account_list_tab: string | null;
   topics: string | null;
   updated_at: string;
@@ -434,6 +473,9 @@ export interface UserConfig {
   skip_login_check: boolean;
   login_tries: number;
   skip_private: boolean;
+  max_followers: number;
+  min_follow_ratio_pct: number;
+  min_posts: number;
   notices_type: string;
   notices_session: boolean;
   notices_login: boolean;

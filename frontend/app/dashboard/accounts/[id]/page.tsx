@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,9 +9,14 @@ import {
   saveAccountSettings,
   updateAccount,
   deleteAccount,
+  getFollowSeeds,
+  addFollowSeed,
+  updateFollowSeed,
+  deleteFollowSeed,
   Account,
   AccountSettings,
   ActionBlock,
+  FollowSeed,
 } from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
 import { BracketCheckbox } from "@/lib/bracket-checkbox";
@@ -24,7 +29,7 @@ import { NumberInput } from "@/lib/number-input";
 const ACTION_TYPES = ["follow", "unfollow", "like"] as const;
 
 const ACTION_TARGETS: Record<string, string[]> = {
-  follow:    ["suggested users", "account list [followers]", "account list [following]", "account list [similar]"],
+  follow:    ["suggested users", "account list [followers]", "account list [following]", "account list [similar]", "post engagers [topics]", "post engagers [account list]"],
   unfollow:  ["previous follows"],
   like: ["posts [homepage]", "posts [topics]"],
 };
@@ -82,6 +87,41 @@ export default function AccountDetailPage() {
   const [pwValue, setPwValue] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [seeds, setSeeds] = useState<FollowSeed[]>([]);
+  const [newSeed, setNewSeed] = useState("");
+  const [seedMsg, setSeedMsg] = useState("");
+
+  const refreshSeeds = useCallback(() => {
+    getFollowSeeds(id).then((r) => setSeeds(r.items)).catch(() => {});
+  }, [id]);
+
+  async function handleAddSeed() {
+    const handle = newSeed.trim();
+    if (!handle) return;
+    setSeedMsg("");
+    try {
+      await addFollowSeed(id, handle);
+      setNewSeed("");
+      refreshSeeds();
+    } catch (err: unknown) {
+      setSeedMsg(err instanceof Error ? err.message : "add failed.");
+    }
+  }
+
+  async function handleToggleSeed(seed: FollowSeed) {
+    const updated = await updateFollowSeed(id, seed.id, { active: !seed.active }).catch(() => null);
+    if (updated) setSeeds((prev) => prev.map((s) => (s.id === seed.id ? updated : s)));
+  }
+
+  async function handleDeleteSeed(seed: FollowSeed) {
+    if (!confirm(`Remove seed "${seed.handle}"?`)) return;
+    await deleteFollowSeed(id, seed.id).catch(() => {});
+    setSeeds((prev) => prev.filter((s) => s.id !== seed.id));
+  }
+
+  useEffect(() => {
+    refreshSeeds();
+  }, [refreshSeeds]);
 
   useEffect(() => {
     getAccounts().then((list) => {
@@ -441,11 +481,68 @@ export default function AccountDetailPage() {
           <div className="px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <div className="text-base04 mb-1">account group</div>
+              <div className="flex items-center gap-x-5 gap-y-1 flex-wrap mb-2">
+                <BracketCheckbox
+                  label="manual list"
+                  checked={(settings.account_group_mode ?? "manual") !== "pool"}
+                  onChange={(v) => { if (v) setSettings((s) => ({ ...s, account_group_mode: "manual" })); }}
+                />
+                <BracketCheckbox
+                  label="dynamic seed pool"
+                  checked={settings.account_group_mode === "pool"}
+                  onChange={(v) => { if (v) setSettings((s) => ({ ...s, account_group_mode: "pool" })); }}
+                />
+              </div>
               <textarea placeholder="comma-separated" rows={5}
                 value={settings.account_group ?? ""}
                 onChange={(e) => setSettings((s) => ({ ...s, account_group: e.target.value || null }))}
                 className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-none break-words whitespace-pre-wrap"
               />
+              <div className="text-base04 mt-3 mb-1">
+                {"seed pool "}
+                <span className="text-base03">{`(${seeds.filter((s) => s.active).length} active - grows from "similar accounts" of the account group / best seed when under 10)`}</span>
+              </div>
+              <div className="border border-base03 p-2 space-y-1 max-h-64 overflow-y-auto">
+                {seeds.length === 0 && <div className="text-base04">----</div>}
+                {seeds.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSeed(s)}
+                      title={s.active ? "active - click to disable" : (s.retire_reason ?? "disabled") + " - click to enable"}
+                      className="group cursor-pointer inline-flex items-center gap-0"
+                    >
+                      <span className="text-base05">[</span>
+                      <span className={s.active ? "text-status-ok group-hover:text-base0e" : "text-base04 group-hover:text-base0e"}>{s.active ? "x" : " "}</span>
+                      <span className="text-base05">]</span>
+                    </button>
+                    <span className={s.active ? "text-base05" : "text-base04 line-through"}>{s.handle}</span>
+                    <span className="text-base04">
+                      {s.complete > 0 ? `${s.followed_back}/${s.complete} (${Math.round((s.rate ?? 0) * 100)}%)` : "----"}
+                    </span>
+                    {s.last_saturation != null && <span className="text-base04">{`sat ${s.last_saturation}%`}</span>}
+                    {s.origin !== "manual" && <span className="text-base03">{s.origin}</span>}
+                    {!s.active && s.retire_reason && <span className="text-base03">{s.retire_reason}</span>}
+                    <button type="button" onClick={() => handleDeleteSeed(s)} className="text-base04 hover:text-status-error transition-colors">[del]</button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-base05">[</span>
+                <input
+                  type="text"
+                  value={newSeed}
+                  onChange={(e) => setNewSeed(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSeed(); } }}
+                  placeholder="handle"
+                  className="bg-transparent text-base05 placeholder-base04 outline-none font-mono w-40"
+                />
+                <span className="text-base05">]</span>
+                <button type="button" onClick={handleAddSeed} className="group cursor-pointer">
+                  <Bracket className="text-base0e group-hover:text-base05">add</Bracket>
+                </button>
+                {seedMsg && <span className="text-status-error">{seedMsg}</span>}
+              </div>
             </div>
             <div>
               <div className="text-base04 mb-1">instagram topics</div>

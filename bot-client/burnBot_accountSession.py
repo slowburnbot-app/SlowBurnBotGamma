@@ -12,6 +12,7 @@ from burnBot_likePostsTopic import do_like_posts_topic
 from burnBot_unfollowDatabase import do_unfollow_database
 from burnBot_followSuggested import do_follow_suggested
 from burnBot_followGroup import do_follow_group
+from burnBot_followEngagers import do_follow_engagers
 from burnBot_randomActions import do_random_action
 from burnBot_client_log import client_log_line, action_combo_slug, action_target_label, summarize_issue_log
 from burnBot_run_log import set_session_context, clear_session_context, capture_failure_context, report_failure, flush_session_log, debug_line
@@ -125,6 +126,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
 
     # Account group / target accounts for follow[group] action
     account_list_tab = settings.get("account_group") or ""
+    account_group_mode = (settings.get("account_group_mode") or "manual").strip().lower()
 
     driver = None
 
@@ -189,6 +191,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                     unfollow_days = int(settings.get("unfollow_days", 30) or 30)
                     action_topics = settings.get("topics") or ""
                     account_list_tab = settings.get("account_group") or ""
+                    account_group_mode = (settings.get("account_group_mode") or "manual").strip().lower()
 
                     debug_line(client_log_line(account, "browser", "Re-read settings from API"))
             except Exception as e:
@@ -365,22 +368,40 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                                     _ran = True
 
                                 elif _act_type == "follow" and _act_target in ["followers[group]", "following[group]", "account list [followers]", "account list [following]", "account list [similar]"]:
-                                    _target_accounts = account_list_tab
-                                    if _target_accounts:
+                                    # Target accounts come from the seed pool (API); the legacy
+                                    # account_group text is only a fallback inside the module.
+                                    _count, _errs, _warns = _unpack_action_result(
+                                        do_follow_group(
+                                            driver, account, _total, apiClient, account_id,
+                                            _act_target, account_list_tab, group_mode=account_group_mode,
+                                            _print=_print, log_scope=_act_scope, action_label=_act_label,
+                                        ),
+                                        "do_follow_group", account, _slot_num, _print)
+                                    if _errs:
+                                        moduleErrorsLog += _errs
+                                    if _warns:
+                                        moduleWarningsLog += _warns
+                                    _ran = True
+
+                                elif _act_type == "follow" and _act_target in ["post engagers [topics]", "post engagers [account list]"]:
+                                    _mode = "topics" if "topics" in _act_target else "accounts"
+                                    _seeds = action_topics if _mode == "topics" else account_list_tab
+                                    if _seeds or _mode == "accounts":
                                         _count, _errs, _warns = _unpack_action_result(
-                                            do_follow_group(
+                                            do_follow_engagers(
                                                 driver, account, _total, apiClient, account_id,
-                                                _act_target, _target_accounts, _print=_print,
-                                                log_scope=_act_scope, action_label=_act_label,
+                                                _mode, _seeds, group_mode=account_group_mode,
+                                                _print=_print, log_scope=_act_scope, action_label=_act_label,
                                             ),
-                                            "do_follow_group", account, _slot_num, _print)
+                                            "do_follow_engagers", account, _slot_num, _print)
                                         if _errs:
                                             moduleErrorsLog += _errs
                                         if _warns:
                                             moduleWarningsLog += _warns
                                         _ran = True
                                     else:
-                                        _print(client_log_line(account, _act_scope, f"{_act_label} ERROR: No target accounts specified"))
+                                        _what = "No topics specified" if _mode == "topics" else "No target accounts specified"
+                                        _print(client_log_line(account, _act_scope, f"{_act_label} ERROR: {_what}"))
 
                                 elif _act_type == "unfollow" and _act_target in ["database", "previous follows"]:
                                     _count, _errs, _warns = _unpack_action_result(
