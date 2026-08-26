@@ -26,6 +26,7 @@ from datetime import date
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import StaleElementReferenceException
 
 from burnBot_human import hsleep, hclick
 from burnBot_client_log import client_log_line
@@ -86,34 +87,56 @@ def _collect_post_links(driver, limit, include_reels):
     return links
 
 
-def _open_likers_dialog(driver):
-    """Click the post's likes link. Returns True once the Likes dialog is present."""
-    links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/liked_by/']")
-    if not links:
-        return False
-    # Prefer the text link ("20 others" / "1,234 likes") over the avatar pile.
-    target = None
+# Likes links come in two layouts (verified live 2026-08-26 on usbgphilly posts):
+#   - <a href="/p/<code>/liked_by/">…44 others</a>   (plus a text-less avatar-pile twin)
+#   - <a href="#"><span>3 others</span></a>          (low like counts — no liked_by href)
+# Both open the same "Likes" dialog. The "Liked by …" line also renders late on some
+# loads, so the link is awaited rather than assumed present after the page settles.
+_LIKES_LINK_XPATH = (
+    "//a[contains(@href,'/liked_by/')]"
+    " | //main//a[contains(normalize-space(),' others') or contains(normalize-space(),' likes')]"
+)
+
+
+def _find_likes_link(driver):
+    links = driver.find_elements(By.XPATH, _LIKES_LINK_XPATH)
+    # Prefer a link with visible text ("44 others" / "1,234 likes") over the avatar pile.
     for a in links:
         try:
             if (a.text or "").strip():
-                target = a
-                break
+                return a
         except Exception:
             continue
-    target = target or links[0]
+    return links[0] if links else None
+
+
+def _open_likers_dialog(driver):
+    """Click the post's likes link. Returns True once the Likes dialog is present."""
     try:
-        hclick(driver, target)
-    except Exception:
-        try:
-            driver.execute_script("arguments[0].click();", target)
-        except Exception:
-            return False
-    try:
-        WebDriverWait(driver, 8).until(lambda d: d.find_elements(By.XPATH, _DIALOG_XPATH))
+        WebDriverWait(driver, 8).until(lambda d: d.find_elements(By.XPATH, _LIKES_LINK_XPATH))
     except Exception:
         return False
-    hsleep(2, 3)
-    return True
+    for attempt in range(2):
+        target = _find_likes_link(driver)
+        if target is None:
+            return False
+        try:
+            if attempt == 0:
+                hclick(driver, target)
+            else:
+                driver.execute_script("arguments[0].click();", target)
+        except Exception:
+            try:
+                driver.execute_script("arguments[0].click();", target)
+            except Exception:
+                return False
+        try:
+            WebDriverWait(driver, 8).until(lambda d: d.find_elements(By.XPATH, _DIALOG_XPATH))
+            hsleep(2, 3)
+            return True
+        except Exception:
+            hsleep(1, 2)
+    return False
 
 
 def _dialog_root(driver):
@@ -122,8 +145,13 @@ def _dialog_root(driver):
 
 
 def _harvest_post_likers(driver, account, remaining, apiClient, account_id, source, lbl,
-                         known, follow_date, scope, exclude):
-    """Follow likers from the open dialog. Returns (followed, skip_known, skip_filtered, errors)."""
+                         known, follow_date, scope, exclude, already=0, target_total=None):
+    """Follow likers from the open dialog. Returns (followed, skip_known, skip_filtered, errors).
+
+    already / target_total: the action-wide running count, so per-follow log lines
+    read "<source>-[NN/NN] - [handle]" like every other follow action."""
+    if target_total is None:
+        target_total = already + remaining
     followed = 0
     skip_known = 0
     skip_filtered = 0
@@ -160,12 +188,22 @@ def _harvest_post_likers(driver, account, remaining, apiClient, account_id, sour
             continue
         stalls = 0
 
+        stale_batch = False
         for user_name, follow_button, anchor in candidates:
             if status_store.is_bot_paused() or followed >= cap:
                 break
             if time.monotonic() - t0 > _POST_BUDGET_S:
                 break
             seen.add(user_name.lower())
+            # The likers list is virtualized: Instagram recycles its rows after a follow or
+            # a scroll, which detaches every element harvested in this batch. One stale
+            # button means the rest are stale too — un-mark this handle and rescan.
+            try:
+                follow_button.is_displayed()
+            except StaleElementReferenceException:
+                seen.discard(user_name.lower())
+                stale_batch = True
+                break
             try:
                 if user_name in known:
                     if known.is_skipped(user_name):
@@ -174,11 +212,11 @@ def _harvest_post_likers(driver, account, remaining, apiClient, account_id, sour
                         skip_known += 1
                     # Likers dialogs are dense with known handles; no visible line, no sleep,
                     # or a 60-row batch would eat the whole per-post budget before any follow.
-                    debug_line(client_log_line(account, scope, f"{lbl}[-skip] - [{user_name}] - [in database]"))
+                    debug_line(client_log_line(account, scope, f"{source}-[-skip] - [{user_name}] - [in database]"))
                     continue
 
                 if not screen_candidate(
-                    driver, apiClient, account_id, account, scope, lbl, source,
+                    driver, apiClient, account_id, account, scope, f"{source}-", source,
                     user_name, anchor, known, follow_date, _p,
                 ):
                     skip_filtered += 1
@@ -197,11 +235,20 @@ def _harvest_post_likers(driver, account, remaining, apiClient, account_id, sour
                     )
                 except Exception:
                     pass
-                _p(client_log_line(account, scope, f"{lbl}[+] - [{user_name}]"))
+                _p(client_log_line(account, scope, f"{source}-[{already + followed:02d}/{target_total:02d}] - [{user_name}]"))
                 hsleep(10, 20)
+            except StaleElementReferenceException:
+                seen.discard(user_name.lower())
+                stale_batch = True
+                break
             except Exception as e:
                 errors += process_exception(True, f"follow user failed: {e}", True, False)
                 continue
+
+        if stale_batch:
+            debug_line(client_log_line(account, scope, f"{lbl}likers list re-rendered - rescanning"))
+            hsleep(1, 2)
+            continue   # fresh candidates from the current viewport; no scroll
 
         if followed < cap:
             try:
@@ -316,13 +363,14 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                     f, k, s, errs = _harvest_post_likers(
                         driver, account, target_count - followed_count, apiClient, account_id,
                         source, _lbl, known, follow_date, _scope, exclude,
+                        already=followed_count, target_total=target_count,
                     )
                     followed_count += f
                     seed_followed += f
                     seed_known += k
                     seed_filtered += s
                     module_errors_log += errs
-                    _p(client_log_line(account, _scope, f"{_lbl}[{followed_count:02d}/{target_count:02d}] post done: +{f} follow(s), {k} known, {s} filtered"))
+                    _p(client_log_line(account, _scope, f"{_lbl}post done: +{f} follow(s), {k} known, {s} filtered [{followed_count:02d}/{target_count:02d}]"))
                 except Exception as e:
                     module_errors_log += process_exception(True, f"post {post_url} failed: {e}", True, False)
                     continue
