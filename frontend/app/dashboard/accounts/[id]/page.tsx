@@ -181,6 +181,7 @@ export default function AccountDetailPage() {
   if (!account) return null;
 
   const groupDisplay = account.group_number != null ? String(account.group_number) : "";
+  const poolMode = settings.account_group_mode === "pool";
 
   return (
     <div className="space-y-6 font-mono">
@@ -480,28 +481,31 @@ export default function AccountDetailPage() {
           </div>
           <div className="px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-4">
             <div>
-              <div className="text-base04 mb-1">account group</div>
-              <div className="flex items-center gap-x-5 gap-y-1 flex-wrap mb-2">
+              {/* account group: exactly one of the two sections is active; the other dims */}
+              <div className="mb-1">
                 <BracketCheckbox
-                  label="manual list"
-                  checked={(settings.account_group_mode ?? "manual") !== "pool"}
+                  label="account group - manual list"
+                  checked={!poolMode}
                   onChange={(v) => { if (v) setSettings((s) => ({ ...s, account_group_mode: "manual" })); }}
                 />
-                <BracketCheckbox
-                  label="dynamic seed pool"
-                  checked={settings.account_group_mode === "pool"}
-                  onChange={(v) => { if (v) setSettings((s) => ({ ...s, account_group_mode: "pool" })); }}
+              </div>
+              <div className={poolMode ? "opacity-40 transition-opacity" : "transition-opacity"}>
+                <textarea placeholder="comma-separated" rows={5}
+                  value={settings.account_group ?? ""}
+                  onChange={(e) => setSettings((s) => ({ ...s, account_group: e.target.value || null }))}
+                  className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
                 />
               </div>
-              <textarea placeholder="comma-separated" rows={5}
-                value={settings.account_group ?? ""}
-                onChange={(e) => setSettings((s) => ({ ...s, account_group: e.target.value || null }))}
-                className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-none break-words whitespace-pre-wrap"
-              />
-              <div className="text-base04 mt-3 mb-1">
-                {"seed pool "}
-                <span className="text-base03">{`(${seeds.filter((s) => s.active).length} active - grows from "similar accounts" of the account group / best seed when under 10)`}</span>
+
+              <div className="mt-3 mb-1">
+                <BracketCheckbox
+                  label="account group - dynamic seed pool"
+                  checked={poolMode}
+                  onChange={(v) => { if (v) setSettings((s) => ({ ...s, account_group_mode: "pool" })); }}
+                />
+                <span className="text-base03 ml-2">{`(${seeds.filter((s) => s.active).length} active - grows from "similar accounts" when under 10)`}</span>
               </div>
+              <div className={poolMode ? "transition-opacity" : "opacity-40 transition-opacity"}>
               <div className="border border-base03 p-2 space-y-1 max-h-64 overflow-y-auto">
                 {seeds.length === 0 && <div className="text-base04">----</div>}
                 {seeds.map((s) => (
@@ -543,13 +547,14 @@ export default function AccountDetailPage() {
                 </button>
                 {seedMsg && <span className="text-status-error">{seedMsg}</span>}
               </div>
+              </div>
             </div>
             <div>
               <div className="text-base04 mb-1">instagram topics</div>
               <textarea placeholder="comma-separated" rows={5}
                 value={settings.topics ?? ""}
                 onChange={(e) => setSettings((s) => ({ ...s, topics: e.target.value || null }))}
-                className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-none break-words whitespace-pre-wrap"
+                className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
               />
             </div>
           </div>
