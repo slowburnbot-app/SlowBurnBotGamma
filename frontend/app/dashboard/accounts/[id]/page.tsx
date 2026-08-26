@@ -29,7 +29,7 @@ import { NumberInput } from "@/lib/number-input";
 const ACTION_TYPES = ["follow", "unfollow", "like"] as const;
 
 const ACTION_TARGETS: Record<string, string[]> = {
-  follow:    ["suggested users", "account list [followers]", "account list [following]", "account list [similar]", "post engagers [topics]", "post engagers [account list]"],
+  follow:    ["suggested users", "account list [followers]", "account list [following]", "account list [similar]", "account list [post engagers]", "topics [post engagers]"],
   unfollow:  ["previous follows"],
   like: ["posts [homepage]", "posts [topics]"],
 };
@@ -475,9 +475,42 @@ export default function AccountDetailPage() {
                 placeholder="30"
               />
               <span className="text-base05">{"]"}</span>
-              <span className="text-base04">{" days"}</span>
+              <span className="text-base04">{"\u00A0days"}</span>
             </span>
 
+          </div>
+          <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base03">
+            <span className="text-base04">follow filters (0 = off):</span>
+            <span className="inline-flex items-center gap-0">
+              <span className="text-base04">{"max followers: "}</span>
+              <span className="text-base05">{"["}</span>
+              <NumberInput
+                value={settings.max_followers}
+                onChange={(n) => setSettings((s) => ({ ...s, max_followers: n }))}
+                placeholder="0" max={9999999} maxLength={7}
+              />
+              <span className="text-base05">{"]"}</span>
+            </span>
+            <span className="inline-flex items-center gap-0">
+              <span className="text-base04">{"min following/followers %: "}</span>
+              <span className="text-base05">{"["}</span>
+              <NumberInput
+                value={settings.min_follow_ratio_pct}
+                onChange={(n) => setSettings((s) => ({ ...s, min_follow_ratio_pct: n }))}
+                placeholder="0" max={999} maxLength={3}
+              />
+              <span className="text-base05">{"]"}</span>
+            </span>
+            <span className="inline-flex items-center gap-0">
+              <span className="text-base04">{"min posts: "}</span>
+              <span className="text-base05">{"["}</span>
+              <NumberInput
+                value={settings.min_posts}
+                onChange={(n) => setSettings((s) => ({ ...s, min_posts: n }))}
+                placeholder="0" max={999} maxLength={3}
+              />
+              <span className="text-base05">{"]"}</span>
+            </span>
           </div>
           <div className="px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-4">
             <div>

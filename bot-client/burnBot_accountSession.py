@@ -383,7 +383,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                                         moduleWarningsLog += _warns
                                     _ran = True
 
-                                elif _act_type == "follow" and _act_target in ["post engagers [topics]", "post engagers [account list]"]:
+                                elif _act_type == "follow" and _act_target in ["account list [post engagers]", "topics [post engagers]", "post engagers [topics]", "post engagers [account list]"]:
                                     _mode = "topics" if "topics" in _act_target else "accounts"
                                     _seeds = action_topics if _mode == "topics" else account_list_tab
                                     if _seeds or _mode == "accounts":

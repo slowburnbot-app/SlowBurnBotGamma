@@ -42,6 +42,12 @@ class AccountSettings(Base):
 
     # Unfollow / follow sources
     unfollow_days: Mapped[int] = mapped_column(Integer, default=30)
+    # Follow candidate filters read off the profile hover card before a follow (0 = rule off):
+    # skip accounts with more than max_followers, require following/followers >=
+    # min_follow_ratio_pct percent, require at least min_posts posts.
+    max_followers: Mapped[int] = mapped_column(Integer, default=5000)
+    min_follow_ratio_pct: Mapped[int] = mapped_column(Integer, default=50)
+    min_posts: Mapped[int] = mapped_column(Integer, default=1)
     list_tab: Mapped[str | None] = mapped_column(String(150), nullable=True)
     account_group: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # Where "account list …" / "post engagers [account list]" take their targets from:

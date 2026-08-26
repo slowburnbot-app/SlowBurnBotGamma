@@ -8,8 +8,9 @@
 #     (posts / followers / following / private), verified live 2026-08-26:
 #     the card is a positioned <div>, NOT a role=dialog, whose innerText reads
 #       "<handle>\n<Full Name>\n92\nposts\n1,424\nfollowers\n1,651\nfollowing\n…"
-#   - the user-configurable quality rules (max_followers, min_follow_ratio_pct,
-#     min_posts, skip_private) and the skip bookkeeping that goes with them.
+#   - the quality rules (per-account max_followers / min_follow_ratio_pct /
+#     min_posts from AccountSettings, user-wide skip_private from UserConfig) and
+#     the skip bookkeeping that goes with them.
 
 import re
 
@@ -225,8 +226,18 @@ def screen_candidate(driver, apiClient, account_id, account, scope, lbl, source,
         page = (driver.page_source or "").lower()
         page_private = any(marker in page for marker in _PRIVATE_MARKERS)
 
-    user_config = apiClient.get_user_config() if apiClient else None
-    verdict, detail = evaluate_candidate(card, user_config, page_private=page_private)
+    # skip_private is user-wide (/config); the numeric thresholds are per account
+    # (account page → follow settings). Both API reads are cached by the client.
+    cfg = dict(apiClient.get_user_config() or {}) if apiClient else {}
+    try:
+        acct = apiClient.get_account_settings(account_id) if apiClient else None
+    except Exception:
+        acct = None
+    if acct:
+        for key in ("max_followers", "min_follow_ratio_pct", "min_posts"):
+            if key in acct:
+                cfg[key] = acct[key]
+    verdict, detail = evaluate_candidate(card, cfg, page_private=page_private)
 
     if card:
         debug_line(client_log_line(

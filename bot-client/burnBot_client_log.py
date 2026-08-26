@@ -87,7 +87,7 @@ def action_combo_slug(act_type: str, act_target: str) -> Optional[str]:
             "account list [similar]",
         ):
             return "follow-group"
-        if g in ("post engagers [topics]", "post engagers [account list]"):
+        if g in ("account list [post engagers]", "topics [post engagers]", "post engagers [topics]", "post engagers [account list]"):
             return "follow-engagers"
     if t == "unfollow":
         if g == "database":
@@ -111,9 +111,9 @@ def action_target_label(act_type: str, act_target: str) -> str:
             return "follow[suggested]"
         if g == "account list [similar]":
             return "follow[similar]"
-        if g == "post engagers [topics]":
+        if g in ("topics [post engagers]", "post engagers [topics]"):
             return "follow[likers-topics]"
-        if g == "post engagers [account list]":
+        if g in ("account list [post engagers]", "post engagers [account list]"):
             return "follow[likers-accounts]"
         if "follower" in g:
             return "follow[followers]"
