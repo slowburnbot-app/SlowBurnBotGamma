@@ -245,6 +245,12 @@ def screen_candidate(driver, apiClient, account_id, account, scope, lbl, source,
             f"{lbl}card [{user_name}] posts={card['posts']} followers={card['followers']} "
             f"following={card['following']} private={card['private']} -> {verdict}",
         ))
+    else:
+        # The filters can't run without a card; say so, or the bypass is invisible in the log.
+        debug_line(client_log_line(
+            account, scope,
+            f"{lbl}card [{user_name}] not rendered -> {verdict} (no-card{', page-private' if page_private else ''})",
+        ))
 
     if verdict == "ok":
         if (page_private or (card and card.get("private"))):

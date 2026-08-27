@@ -34,7 +34,7 @@ from burnBot_run_log import debug_line
 from burnBot_utils import process_exception
 from burnBot_followSuggested import _find_home_follow_candidates
 import burnBot_followGroup as _fg
-from burnBot_followGroup import _saturation_warning, _saturation_pct
+from burnBot_followGroup import _saturation_warning, _saturation_pct, _ZERO_YIELD_SATURATION
 from burnBot_followFilter import load_known_handles, screen_candidate
 from burnBot_seeds import load_seed_pool, order_seeds, finish_seed_use, maybe_discover_seeds
 import burnBot_likePostsTopic as _lpt
@@ -92,6 +92,11 @@ def _collect_post_links(driver, limit, include_reels):
 #   - <a href="#"><span>3 others</span></a>          (low like counts — no liked_by href)
 # Both open the same "Likes" dialog. The "Liked by …" line also renders late on some
 # loads, so the link is awaited rather than assumed present after the page settles.
+# Two cases never match (verified live 2026-08-27):
+#   - /reel/ pages: the like count is a bare number in the side rail, no anchor and no
+#     "likes"/"others" text — so reels are never collected for the likers harvest.
+#   - posts with hidden like counts: no "Liked by"/"N likes" line at all for a viewer who
+#     follows none of the likers; an account that hides on every post is a dead seed.
 _LIKES_LINK_XPATH = (
     "//a[contains(@href,'/liked_by/')]"
     " | //main//a[contains(normalize-space(),' others') or contains(normalize-space(),' likes')]"
@@ -338,7 +343,7 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                     module_errors_log += f"{action_label or 'follow[engagers]'}: {msg}\n"
                     finish_seed_use(apiClient, seed_entry, None, account_rate, account, _scope, _lbl, _p, retire_reason="not found")
                     continue
-                post_links = _collect_post_links(driver, _POSTS_PER_ACCOUNT, include_reels=True)
+                post_links = _collect_post_links(driver, _POSTS_PER_ACCOUNT, include_reels=False)
 
             if not post_links:
                 _p(client_log_line(account, _scope, f"{_lbl}Warning: no posts found for [{seed}]"))
@@ -349,6 +354,7 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
             seed_followed = 0
             seed_known = 0
             seed_filtered = 0
+            seed_dialogs = 0
             for post_url in post_links:
                 if status_store.is_bot_paused() or followed_count >= target_count:
                     break
@@ -359,6 +365,7 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                     if not _open_likers_dialog(driver):
                         debug_line(client_log_line(account, _scope, f"{_lbl}no likes dialog for {post_url}"))
                         continue
+                    seed_dialogs += 1
 
                     f, k, s, errs = _harvest_post_likers(
                         driver, account, target_count - followed_count, apiClient, account_id,
@@ -374,6 +381,17 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                 except Exception as e:
                     module_errors_log += process_exception(True, f"post {post_url} failed: {e}", True, False)
                     continue
+
+            if seed_dialogs == 0 and not status_store.is_bot_paused():
+                # Every post refused a likers dialog — the seed hides like counts (or the
+                # pages failed). Same treatment as follow[group]'s zero-yield target: mark it
+                # 100% saturated so the pool damps it now and retires it on the next dry use.
+                msg = f"[{seed}] no likes link on {len(post_links)} post(s) - like counts hidden?"
+                _p(client_log_line(account, _scope, f"{_lbl}Warning: {msg} - trying next seed"))
+                module_warnings_log += f"{action_label or 'follow[engagers]'}: {msg}\n"
+                if mode != "topics":
+                    finish_seed_use(apiClient, seed_entry, _ZERO_YIELD_SATURATION, account_rate, account, _scope, _lbl, _p)
+                continue
 
             module_warnings_log += _saturation_warning(
                 account, _scope, _lbl, action_label, seed, seed_known, seed_filtered, seed_followed,

@@ -29,6 +29,7 @@ DISCOVERY_MAX_PER_PASS = 5 # new seeds per discovery pass — keeps unproven see
 SATURATION_RETIRE = 80     # % of the pool already known
 MIN_COMPLETE_RETIRE = 30   # completed targets before a low rate can retire a seed
 _DISCOVERY_PAGES = 8       # Similar-accounts carousel pages to read
+_DISCOVERY_MAX_PARENTS = 3 # parents to try per pass before giving up (some profiles have no Similar panel)
 
 
 def parse_group(group_csv):
@@ -113,36 +114,11 @@ def finish_seed_use(apiClient, seed, saturation_pct, account_rate, account, scop
     apiClient.update_seed(seed["id"], **fields)
 
 
-def maybe_discover_seeds(driver, apiClient, account_id, account, pool, all_seeds, group_handles, scope, lbl, _p):
-    """Pool mode only. When the active pool is under the floor, read a parent's
-    Similar accounts carousel (no following) and add up to DISCOVERY_MAX_PER_PASS
-    new handles as seeds. Parent = best active seed, else best retired seed, else
-    a random account-group handle (that's how an empty pool bootstraps).
-    Mutates `pool` (appends the new active seeds). Returns the handles added."""
-    if any(not s.get("id") for s in pool):
-        return []   # manual list / API fallback — nothing to grow
-    api_seeds = list(pool)
-    api_all = [s for s in (all_seeds or []) if s.get("id")]
-    if len(api_seeds) >= POOL_FLOOR:
-        return []
-
-    # Lazy imports: followGroup imports this module.
-    import burnBot_followGroup as fg
-    from burnBot_followSuggested import _find_home_follow_candidates
-
-    if api_seeds or api_all:
-        parent_handle = max(api_seeds or api_all, key=seed_weight)["handle"]
-    elif group_handles:
-        parent_handle = random.choice(group_handles)
-    else:
-        _p(client_log_line(account, scope, f"{lbl}Warning: seed pool is empty and account group is blank - nothing to discover from"))
-        return []
-    existing = {s["handle"].lower() for s in api_all} | {h.lower() for h in group_handles} | {account.lower()}
-    want = min(DISCOVERY_MAX_PER_PASS, POOL_CEILING - len(api_seeds))
-    if want <= 0:
-        return []
-
-    _p(client_log_line(account, scope, f"{lbl}seed pool low ({len(api_seeds)}/{POOL_FLOOR}) - discovering from [{parent_handle}]"))
+def _discover_from(driver, parent_handle, existing, want, fg, find_candidates, account, scope, lbl, _p):
+    """Read up to `want` new handles from one parent's Similar accounts carousel.
+    Returns the list (possibly empty) when the carousel opened, None when the
+    profile is missing, has no Similar panel, or the read raised — the caller
+    moves on to the next parent in that case."""
     found = []
     try:
         driver.get(f"https://www.instagram.com/{parent_handle}/")
@@ -150,15 +126,15 @@ def maybe_discover_seeds(driver, apiClient, account_id, account, pool, all_seeds
         hsleep(3, 5)
         if driver.find_elements(By.XPATH, "//*[contains(text(), \"Sorry, this page isn't available.\")]"):
             _p(client_log_line(account, scope, f"{lbl}Warning: seed [{parent_handle}] not found - skipping discovery"))
-            return []
+            return None
         fg._p = _p
         opened, _warn = fg._open_similar_panel(driver, account, parent_handle, scope, lbl)
         if not opened:
-            return []
+            return None
 
         seen = set()
         for _page in range(_DISCOVERY_PAGES):
-            for handle, _btn, _anchor in _find_home_follow_candidates(driver, max_candidates=60):
+            for handle, _btn, _anchor in find_candidates(driver, max_candidates=60):
                 h = handle.lower()
                 if h in seen or h in existing:
                     continue
@@ -176,6 +152,51 @@ def maybe_discover_seeds(driver, apiClient, account_id, account, pool, all_seeds
                 break
     except Exception as e:
         _p(client_log_line(account, scope, f"{lbl}Warning: seed discovery failed: {str(e).splitlines()[0][:80]}"))
+        return None
+    return found
+
+
+def maybe_discover_seeds(driver, apiClient, account_id, account, pool, all_seeds, group_handles, scope, lbl, _p):
+    """Pool mode only. When the active pool is under the floor, read a parent's
+    Similar accounts carousel (no following) and add up to DISCOVERY_MAX_PER_PASS
+    new handles as seeds. Parents are tried in weighted random order (active
+    seeds, else retired ones, up to _DISCOVERY_MAX_PARENTS), else a random
+    account-group handle (that's how an empty pool bootstraps).
+    Mutates `pool` (appends the new active seeds). Returns the handles added."""
+    if any(not s.get("id") for s in pool):
+        return []   # manual list / API fallback — nothing to grow
+    api_seeds = list(pool)
+    api_all = [s for s in (all_seeds or []) if s.get("id")]
+    if len(api_seeds) >= POOL_FLOOR:
+        return []
+
+    # Lazy imports: followGroup imports this module.
+    import burnBot_followGroup as fg
+    from burnBot_followSuggested import _find_home_follow_candidates
+
+    # Candidate parents in weighted random order — a plain max() over a pool of new seeds
+    # (all tied at the 0.5 prior) returned the same first row every run, and one parent
+    # without a Similar accounts button stalled discovery indefinitely. Try a few.
+    if api_seeds or api_all:
+        parents = [s["handle"] for s in order_seeds(api_seeds or api_all)[:_DISCOVERY_MAX_PARENTS]]
+    elif group_handles:
+        parents = [random.choice(group_handles)]
+    else:
+        _p(client_log_line(account, scope, f"{lbl}Warning: seed pool is empty and account group is blank - nothing to discover from"))
+        return []
+    existing = {s["handle"].lower() for s in api_all} | {h.lower() for h in group_handles} | {account.lower()}
+    want = min(DISCOVERY_MAX_PER_PASS, POOL_CEILING - len(api_seeds))
+    if want <= 0:
+        return []
+
+    found = None
+    parent_handle = None
+    for parent_handle in parents:
+        _p(client_log_line(account, scope, f"{lbl}seed pool low ({len(api_seeds)}/{POOL_FLOOR}) - discovering from [{parent_handle}]"))
+        found = _discover_from(driver, parent_handle, existing, want, fg, _find_home_follow_candidates, account, scope, lbl, _p)
+        if found is not None:
+            break
+    if found is None:
         return []
 
     added = []
