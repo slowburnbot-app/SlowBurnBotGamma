@@ -67,6 +67,26 @@ function parseTime(v: string): string | null {
   return v.slice(0, 5) || null;
 }
 
+/** Reformat a pasted/typed list (one per line, spaces, commas, "@"/"#" prefixes)
+ *  into the bot's "a, b, c" form. Topics may contain spaces, so they only split
+ *  on newlines and commas; handles never do, so they also split on whitespace. */
+function normalizeList(raw: string | null | undefined, kind: "accounts" | "topics"): string | null {
+  const text = raw ?? "";
+  const parts = kind === "accounts" ? text.split(/[\s,]+/) : text.split(/[\n\r,]+/);
+  const prefix = kind === "accounts" ? /^@+/ : /^#+/;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const item = p.trim().replace(prefix, "").trim();
+    if (!item) continue;
+    const key = item.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out.length ? out.join(", ") : null;
+}
+
 // ── styles ────────────────────────────────────────────────────────────────────
 
 const sectionCls = "border border-base03";
@@ -162,7 +182,13 @@ export default function AccountDetailPage() {
     setSaving(true);
     setMsg("");
     try {
-      await saveAccountSettings(id, { ...settings, actions });
+      const cleaned = {
+        ...settings,
+        account_group: normalizeList(settings.account_group, "accounts"),
+        topics: normalizeList(settings.topics, "topics"),
+      };
+      setSettings(cleaned);
+      await saveAccountSettings(id, { ...cleaned, actions });
       setMsg("saved.");
     } catch (err: unknown) {
       setMsg(err instanceof Error ? err.message : "save failed.");
@@ -538,9 +564,10 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className={poolMode ? "opacity-40 transition-opacity" : "transition-opacity"}>
-                <textarea ref={groupRef} placeholder="comma-separated" rows={5}
+                <textarea ref={groupRef} placeholder="one per line or comma-separated" rows={5}
                   value={settings.account_group ?? ""}
                   onChange={(e) => setSettings((s) => ({ ...s, account_group: e.target.value || null }))}
+                  onBlur={() => setSettings((s) => ({ ...s, account_group: normalizeList(s.account_group, "accounts") }))}
                   className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
                 />
               </div>
@@ -599,9 +626,10 @@ export default function AccountDetailPage() {
             </div>
             <div>
               <div className="text-base04 mb-1">instagram topics</div>
-              <textarea ref={topicsRef} placeholder="comma-separated" rows={5}
+              <textarea ref={topicsRef} placeholder="one per line or comma-separated" rows={5}
                 value={settings.topics ?? ""}
                 onChange={(e) => setSettings((s) => ({ ...s, topics: e.target.value || null }))}
+                onBlur={() => setSettings((s) => ({ ...s, topics: normalizeList(s.topics, "topics") }))}
                 className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
               />
             </div>
