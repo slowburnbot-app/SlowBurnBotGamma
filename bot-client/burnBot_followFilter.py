@@ -15,6 +15,7 @@
 import re
 
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.by import By
 
 from burnBot_human import hsleep
 from burnBot_client_log import client_log_line
@@ -105,21 +106,23 @@ def fmt_count(n):
     return f"{n:,}"
 
 
-def evaluate_candidate(card, user_config, page_private=False):
+def evaluate_candidate(card, user_config):
     """Apply the user's follow filters to a parsed hover card.
 
     Returns (verdict, detail) where verdict is one of
       ok | private | too_big | low_ratio | no_posts
     A missing card never blocks a follow ("ok", "no-card") — the filters are a
     quality lever, not a gate, and IG sometimes just doesn't render the card.
+    Privacy is judged from the card alone: the old whole-page fallback read the
+    PREVIOUS candidate's still-open private card and skipped public accounts
+    (13 of 23 such skips on 2026-08-27 were public).
     """
     cfg = user_config or {}
     skip_private = bool(cfg.get("skip_private", False))
-    is_private = page_private or bool(card and card.get("private"))
-    if is_private and skip_private:
-        return "private", ""
     if not card:
         return "ok", "no-card"
+    if card.get("private") and skip_private:
+        return "private", ""
 
     followers, following, posts = card.get("followers"), card.get("following"), card.get("posts")
 
@@ -204,6 +207,47 @@ def read_hover_card(driver, user_name):
     return parse_hover_card(text)
 
 
+_CARD_TRIES = 3   # hover attempts per candidate before giving up on the card
+
+
+def _park_pointer(driver):
+    """Move the mouse somewhere that opens no hover card, so the previous
+    candidate's card closes. IG keeps a card open while the pointer slides
+    straight from one username to the next, and no card renders for the new
+    one until the old one is gone — that is what produced the runs of card-less
+    candidates right after every private card."""
+    try:
+        target = driver.find_element(By.CSS_SELECTOR, "nav, [role='navigation']")
+        ActionChains(driver).move_to_element(target).perform()
+        return
+    except Exception:
+        pass
+    try:
+        ActionChains(driver).move_by_offset(-250, 0).perform()
+    except Exception:
+        pass
+
+
+def _hover_and_read(driver, user_name, anchor):
+    """Hover `anchor` and read the card keyed to `user_name`, re-hovering (after
+    parking the pointer) when nothing rendered. Returns (card|None, attempts)."""
+    tries = _CARD_TRIES if anchor is not None else 1
+    for attempt in range(1, tries + 1):
+        if attempt > 1:
+            _park_pointer(driver)
+            hsleep(0.6, 1.2)
+        if anchor is not None:
+            try:
+                ActionChains(driver).move_to_element(anchor).perform()
+                hsleep(1, 2)
+            except Exception:
+                pass
+        card = read_hover_card(driver, user_name)
+        if card is not None:
+            return card, attempt
+    return None, tries
+
+
 def screen_candidate(driver, apiClient, account_id, account, scope, lbl, source,
                      user_name, anchor, known, follow_date, _p):
     """Hover the candidate, read its card, apply the filters.
@@ -212,19 +256,7 @@ def screen_candidate(driver, apiClient, account_id, account, scope, lbl, source,
     follow-target row is written (status 'private' or 'skipped') so the handle is
     never re-evaluated, the handle is added to `known`, and the skip line is printed.
     """
-    if anchor is not None:
-        try:
-            ActionChains(driver).move_to_element(anchor).perform()
-            hsleep(1, 2)
-        except Exception:
-            pass
-
-    card = read_hover_card(driver, user_name)
-    page_private = False
-    if card is None:
-        # No card keyed to this username — fall back to the old whole-page scan.
-        page = (driver.page_source or "").lower()
-        page_private = any(marker in page for marker in _PRIVATE_MARKERS)
+    card, attempts = _hover_and_read(driver, user_name, anchor)
 
     # skip_private is user-wide (/config); the numeric thresholds are per account
     # (account page → follow settings). Both API reads are cached by the client.
@@ -237,23 +269,24 @@ def screen_candidate(driver, apiClient, account_id, account, scope, lbl, source,
         for key in ("max_followers", "min_follow_ratio_pct", "min_posts"):
             if key in acct:
                 cfg[key] = acct[key]
-    verdict, detail = evaluate_candidate(card, cfg, page_private=page_private)
+    verdict, detail = evaluate_candidate(card, cfg)
 
+    retry_note = f" (try {attempts})" if attempts > 1 else ""
     if card:
         debug_line(client_log_line(
             account, scope,
             f"{lbl}card [{user_name}] posts={card['posts']} followers={card['followers']} "
-            f"following={card['following']} private={card['private']} -> {verdict}",
+            f"following={card['following']} private={card['private']} -> {verdict}{retry_note}",
         ))
     else:
         # The filters can't run without a card; say so, or the bypass is invisible in the log.
         debug_line(client_log_line(
             account, scope,
-            f"{lbl}card [{user_name}] not rendered -> {verdict} (no-card{', page-private' if page_private else ''})",
+            f"{lbl}card [{user_name}] not rendered after {attempts} hover(s) -> {verdict} (no-card)",
         ))
 
     if verdict == "ok":
-        if (page_private or (card and card.get("private"))):
+        if card and card.get("private"):
             _p(client_log_line(account, scope, f"{lbl}private @{user_name}"))
         return True
 
