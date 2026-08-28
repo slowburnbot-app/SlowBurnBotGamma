@@ -21,6 +21,7 @@
 
 import builtins as _builtins
 import random
+import re
 import time
 from datetime import date
 
@@ -68,8 +69,17 @@ def _wait_ready(driver, timeout=15):
     WebDriverWait(driver, timeout).until(lambda d: d.execute_script("return document.readyState") == "complete")
 
 
+_REEL_PATH_RE = re.compile(r"/reel/([^/?#]+)/?")
+
+
 def _collect_post_links(driver, limit, include_reels):
-    """Unique post URLs from whatever grid is on the page, in DOM order."""
+    """Unique post URLs from whatever grid is on the page, in DOM order.
+
+    Reel links are rewritten to /p/<code>/ — IG serves the same media there in
+    the post layout, which carries the likes link the /reel/ layout lacks
+    (verified 2026-08-28: /p/DcKENiBJL7U/ shows "3 others"; the /reel/ URL never
+    does). Some grids are reel-only (buckscountyviews 12/12 that day), so
+    dropping reels outright starved otherwise-productive seeds."""
     sel = "a[href*='/p/'], a[href*='/reel/']" if include_reels else "a[href*='/p/']"
     links = []
     seen = set()
@@ -78,6 +88,7 @@ def _collect_post_links(driver, limit, include_reels):
             href = a.get_attribute("href") or ""
         except Exception:
             continue
+        href = _REEL_PATH_RE.sub(r"/p/\1/", href)
         if not href or href in seen:
             continue
         seen.add(href)
@@ -94,7 +105,8 @@ def _collect_post_links(driver, limit, include_reels):
 # loads, so the link is awaited rather than assumed present after the page settles.
 # Two cases never match (verified live 2026-08-27):
 #   - /reel/ pages: the like count is a bare number in the side rail, no anchor and no
-#     "likes"/"others" text — so reels are never collected for the likers harvest.
+#     "likes"/"others" text — so reel links are opened as /p/<code>/ instead
+#     (_collect_post_links), never at their /reel/ URL.
 #   - posts with hidden like counts: no "Liked by"/"N likes" line at all for a viewer who
 #     follows none of the likers; an account that hides on every post is a dead seed.
 _LIKES_LINK_XPATH = (
@@ -343,7 +355,7 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                     module_errors_log += f"{action_label or 'follow[engagers]'}: {msg}\n"
                     finish_seed_use(apiClient, seed_entry, None, account_rate, account, _scope, _lbl, _p, retire_reason="not found")
                     continue
-                post_links = _collect_post_links(driver, _POSTS_PER_ACCOUNT, include_reels=False)
+                post_links = _collect_post_links(driver, _POSTS_PER_ACCOUNT, include_reels=True)
 
             if not post_links:
                 _p(client_log_line(account, _scope, f"{_lbl}Warning: no posts found for [{seed}]"))
