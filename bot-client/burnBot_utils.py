@@ -464,5 +464,30 @@ def get_post_author_username(article):
             except Exception:
                 continue
 
+    # Alt-text fallback: some feed article layouts render the header profile
+    # link as a <span role="link"> with no <a href> anywhere in the article,
+    # but the avatar <img> alt still names the author
+    # ("<username>'s profile picture"). Header-scoped first so a liked-by or
+    # comment avatar can't win over the author's.
+    for img_locator in (
+        ".//header//img[contains(@alt, \"'s profile picture\")]",
+        ".//img[contains(@alt, \"'s profile picture\")]",
+    ):
+        try:
+            images = article.find_elements(By.XPATH, img_locator)
+        except Exception:
+            continue
+        for image in images:
+            try:
+                alt_text = image.get_attribute("alt") or ""
+                candidate = alt_text.split("'s profile picture", 1)[0].strip()
+                username = extract_username_from_href(candidate)
+                if username:
+                    return username
+            except StaleElementReferenceException:
+                continue
+            except Exception:
+                continue
+
     return "unknown"
 
