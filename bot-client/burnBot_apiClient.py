@@ -219,22 +219,41 @@ class ApiClient:
                 return self.login(email, password)
             return False
 
-    def _request(self, method, path, **kwargs):
+    def _request(self, method, path, clear_on_auth_fail=True, **kwargs):
         """
         Make an authenticated request with auto-retry on 401.
         Raises an exception on persistent auth failure.
+
+        clear_on_auth_fail=False keeps a 401 from wiping the stored token —
+        for non-critical calls (heartbeat) that must never kill the session
+        other threads are using.
         """
         headers = kwargs.pop("headers", {})
-        headers.update(self._auth_headers())
+        token_used = self._access_token
+        if token_used:
+            headers["Authorization"] = f"Bearer {token_used}"
 
         resp = self.client.request(method, path, headers=headers, **kwargs)
+
+        if resp.status_code == 401:
+            # The daily rotation revokes the old token the instant the new one
+            # is minted, so a request built just before the swap can land with
+            # a revoked token. If the stored token changed while this request
+            # was in flight, the 401 is that race, not a real expiry — retry
+            # once with the current token.
+            with self._token_lock:
+                current_token = self._access_token
+            if current_token and current_token != token_used:
+                headers["Authorization"] = f"Bearer {current_token}"
+                resp = self.client.request(method, path, headers=headers, **kwargs)
 
         if resp.status_code == 401:
             if self._relogin():
                 headers.update(self._auth_headers())
                 resp = self.client.request(method, path, headers=headers, **kwargs)
             if resp.status_code == 401:
-                self._clear_token()
+                if clear_on_auth_fail:
+                    self._clear_token()
                 raise AuthenticationError("Session expired. Please log in again.")
 
         if resp.status_code == 402:
@@ -262,7 +281,7 @@ class ApiClient:
     def send_heartbeat(self, client_id, system_type, ip_address, status, current_account=None, bot_version=""):
         """Send a heartbeat to the backend. Non-critical — failures are silently ignored."""
         try:
-            self._request("POST", "/bot/heartbeat", json={
+            self._request("POST", "/bot/heartbeat", clear_on_auth_fail=False, json={
                 "client_id": int(client_id) if client_id else 0,
                 "system_type": system_type or "",
                 "ip_address": ip_address or "",
