@@ -492,6 +492,20 @@ async def post_heartbeat(
             )
             .values(bot_version=body.bot_version)
         )
+    # A live authenticated heartbeat is stronger proof of activation than the
+    # first-launch token handshake — a slot recreated (or configured without
+    # consuming its token) while its client keeps running via JWT would
+    # otherwise show "pending" forever. The activate endpoint no longer keys
+    # its lookup on status, so this flip can't break a pending token handshake.
+    await session.execute(
+        update(DesktopBuild)
+        .where(
+            DesktopBuild.user_id == user.id,
+            DesktopBuild.client_id == body.client_id,
+            DesktopBuild.status == "pending_activation",
+        )
+        .values(status="activated", activated_at=datetime.now(timezone.utc))
+    )
     # A concurrent heartbeat for the same (user_id, client_id) racing this
     # insert is harmless to ignore — another call landed equivalent data
     # within the same ~60s tick, so there's nothing left to apply here.
@@ -511,11 +525,14 @@ async def activate_desktop_build(
     """
     now = datetime.now(timezone.utc)
 
+    # No status filter — unique (user_id, client_id) yields one row, and the
+    # consumed/expiry/hash checks below enforce single-use. A heartbeat may
+    # flip a pending slot to "activated" before its token handshake runs
+    # (an old container heartbeating the same slot); the token must still work.
     build = await session.scalar(
         select(DesktopBuild).where(
             DesktopBuild.user_id == body.user_id,
             DesktopBuild.client_id == body.client_id,
-            DesktopBuild.status == "pending_activation",
         )
     )
     if build is None:
