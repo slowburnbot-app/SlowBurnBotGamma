@@ -312,7 +312,7 @@ class BurnBotApp(App):
         Binding("escape", "clear_input", "Clear", show=False),
     ]
 
-    _COMMANDS = ["/browser", "/copy-log", "/exit", "/help", "/keep-browser", "/save-log", "/settings", "/start", "/stop", "/tint"]
+    _COMMANDS = ["/browser", "/exit", "/help", "/keep-browser", "/log-clear", "/log-copy", "/log-save", "/settings", "/start", "/stop", "/tint"]
 
     _HELP_CMDS = [
         ("/stop",     "Stop all sessions (bot stays running)"),
@@ -320,8 +320,9 @@ class BurnBotApp(App):
         ("/exit",     "Fully exit the bot"),
         ("/settings", "Open settings panel"),
         ("/tint",     "Select color theme (tinty / terminal / default)"),
-        ("/save-log", "Save a plain text copy of the log"),
-        ("/copy-log", "Copy the log to the clipboard"),
+        ("/log-save", "Save a plain text copy of the log"),
+        ("/log-copy", "Copy the log to the clipboard"),
+        ("/log-clear", "Clear the terminal log screen"),
         ("/browser [account]", "Open a browser into the VNC display for manual login checks"),
         ("/keep-browser", "Toggle whether the session browser stays open after a session"),
         ("/help",     "Show this screen"),
@@ -1022,7 +1023,7 @@ class BurnBotApp(App):
             self._open_tint()
         elif cmd == "/help":
             self._open_help()
-        elif cmd == "/save-log":
+        elif cmd == "/log-save":
             ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
             fname = f"slowburnbot_log_{ts}.txt"
             try:
@@ -1031,12 +1032,16 @@ class BurnBotApp(App):
                 self._write_log(_escape(client_log_line(None, "terminal-command", f"Log saved: {os.path.abspath(fname)}")))
             except Exception as e:
                 self._write_log(_escape(client_log_line(None, "terminal-command", f"Save failed: {e}")))
-        elif cmd == "/copy-log":
+        elif cmd == "/log-copy":
             try:
                 self.copy_to_clipboard("\n".join(self._log_lines))
                 self._write_log(_escape(client_log_line(None, "terminal-command", "Log copied to clipboard")))
             except Exception as e:
                 self._write_log(_escape(client_log_line(None, "terminal-command", f"Copy failed: {e}")))
+        elif cmd == "/log-clear":
+            self.query_one("#log", DefaultBgRichLog).clear()
+            self._log_lines.clear()
+            self._write_log(_escape(client_log_line(None, "terminal-command", "Log cleared")))
         elif cmd == "/browser" or cmd.startswith("/browser "):
             parts = cmd.split(maxsplit=1)
             account = parts[1].strip() if len(parts) > 1 else None

@@ -3,7 +3,7 @@
 # Developer-facing remote diagnostics for the bot client. Nothing here writes
 # to the customer's disk — the customer never modifies code, so local debug
 # files help nobody (the developer can't reach them; the customer has the live
-# TUI, /save-log, and the dashboard). Everything diagnostic goes to the
+# TUI, /log-save, and the dashboard). Everything diagnostic goes to the
 # backend instead, where the developer can actually read it:
 #
 #   - report_failure(): a compact, structured failure record (stage, timing,
