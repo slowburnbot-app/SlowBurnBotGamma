@@ -29,7 +29,7 @@ import { NumberInput } from "@/lib/number-input";
 const ACTION_TYPES = ["follow", "unfollow", "like"] as const;
 
 const ACTION_TARGETS: Record<string, string[]> = {
-  follow:    ["suggested users", "account list [followers]", "account list [following]", "account list [similar]", "account list [likers]", "topics [likers]"],
+  follow:    ["suggested users", "account list [likers]", "topics [likers]", "account list [followers]", "account list [following]", "account list [similar]"],
   unfollow:  ["previous follows"],
   like: ["posts [homepage]", "posts [topics]"],
 };
