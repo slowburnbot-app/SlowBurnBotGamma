@@ -4,7 +4,7 @@
 
 import builtins
 
-from burnBot_client_log import client_log_line, summarize_issue_log
+from burnBot_client_log import action_target_label, client_log_line, summarize_issue_log
 from burnBot_run_log import debug_line
 
 
@@ -223,7 +223,7 @@ def send_session_complete_notification(account, start_time, end_time,
                 n = int(action_count)
             except Exception:
                 n = 0
-            label = f"{action_type}[{action_target}]" if action_target else str(action_type)
+            label = action_target_label(action_type, action_target) if action_target else str(action_type)
             return f"[{n:02d}] {label}"
 
         user_config = apiClient.get_user_config() if apiClient else None

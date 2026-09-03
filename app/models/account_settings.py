@@ -50,7 +50,7 @@ class AccountSettings(Base):
     min_posts: Mapped[int] = mapped_column(Integer, default=1)
     list_tab: Mapped[str | None] = mapped_column(String(150), nullable=True)
     account_group: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    # Where "account list …" / "post engagers [account list]" take their targets from:
+    # Where "account list …" (incl. "account list [likers]") take their targets from:
     #   manual — the account_group text above, random pick (the original behaviour)
     #   pool   — the follow_seeds table: follow-back-weighted pick, auto-retire,
     #            auto-discovery (bootstrapped from account_group when the pool is empty)

@@ -53,7 +53,7 @@ def _saturation_warning(account, scope, lbl, action_label, target_account, skip_
     saturation = pct / 100
     if processed >= _SATURATION_MIN_ENTRIES and saturation >= _SATURATION_WARN_RATIO:
         _p(client_log_line(account, scope, f"{lbl}Warning: [{target_account}] {pct}% saturated ({skip_already} of {processed} entries already followed) - consider rotating target accounts"))
-        return f"{action_label or 'follow[group]'}: [{target_account}] {pct}% saturated ({skip_already}/{processed} already followed) - rotate targets\n"
+        return f"{action_label}: [{target_account}] {pct}% saturated ({skip_already}/{processed} already followed) - rotate targets\n"
     debug_line(client_log_line(account, scope, f"{lbl}debug target [{target_account}] saturation {pct}% ({skip_already} of {processed} entries already followed)"))
     return ""
 
@@ -215,7 +215,6 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
     _scope = log_scope or "follow-group"
     _lbl = f"{action_label}-" if action_label else ""
     _done_lbl = (action_label[0].upper() + action_label[1:]) if action_label else "Done"
-    _warn_lbl = action_label or "follow[group]"
     """
     Follow accounts from a target account's followers / following list or its
     Similar-accounts carousel. Targets are tried in weighted order until the count
@@ -262,6 +261,8 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         else:
             _p(client_log_line(account, _scope, f"{_lbl}ERROR: Invalid group type"))
             return 0, f"Invalid group type: {group_type}", ""
+        # Fallback error prefix matches the real log label family (mode is known here).
+        _warn_lbl = action_label or f"follow[{action_type}]"
 
         def _mine_target(seed, remaining):
             """Mine one target. Returns dict(followed, skip_already, skip_private,
@@ -534,7 +535,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                 continue
 
             module_warnings_log += _saturation_warning(
-                account, _scope, _lbl, action_label, target_account, r["skip_already"], r["skip_private"], r["followed"],
+                account, _scope, _lbl, _warn_lbl, target_account, r["skip_already"], r["skip_private"], r["followed"],
             )
             finish_seed_use(
                 apiClient, seed, _saturation_pct(r["skip_already"], r["skip_private"], r["followed"]),

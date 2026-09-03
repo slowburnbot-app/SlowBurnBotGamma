@@ -67,36 +67,6 @@ def summarize_issue_log(log_text: str, max_len: int = 60) -> Optional[str]:
     return summary
 
 
-def action_combo_slug(act_type: str, act_target: str) -> Optional[str]:
-    """Hyphenated action-target for dashboard/API type+target pairs (single source of truth)."""
-    t = (act_type or "").strip().lower()
-    g = (act_target or "").strip().lower()
-    if t == "like":
-        if g in ("home", "homepage posts", "post[homepage]", "posts [homepage]"):
-            return "like-home"
-        if g in ("post[topics]", "posts [topics]"):
-            return "like-topics"
-    if t == "follow":
-        if g in ("suggested", "home", "homepage", "suggested users"):
-            return "follow-suggested"
-        if g in (
-            "followers[group]",
-            "following[group]",
-            "account list [followers]",
-            "account list [following]",
-            "account list [similar]",
-        ):
-            return "follow-group"
-        if g in ("account list [post engagers]", "topics [post engagers]", "post engagers [topics]", "post engagers [account list]"):
-            return "follow-engagers"
-    if t == "unfollow":
-        if g == "database":
-            return "unfollow-database"
-        if g == "previous follows":
-            return "unfollow-previous"
-    return None
-
-
 def action_target_label(act_type: str, act_target: str) -> str:
     """verb[target] slug for the log taxonomy (e.g. 'like-post[homepage]', 'follow[suggested]')."""
     t = (act_type or "").strip().lower()
@@ -111,9 +81,9 @@ def action_target_label(act_type: str, act_target: str) -> str:
             return "follow[suggested]"
         if g == "account list [similar]":
             return "follow[similar]"
-        if g in ("topics [post engagers]", "post engagers [topics]"):
+        if g in ("topics [likers]", "topics [post engagers]", "post engagers [topics]"):
             return "follow[likers-topics]"
-        if g in ("account list [post engagers]", "post engagers [account list]"):
+        if g in ("account list [likers]", "account list [post engagers]", "post engagers [account list]"):
             return "follow[likers-accounts]"
         if "follower" in g:
             return "follow[followers]"

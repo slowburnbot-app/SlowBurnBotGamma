@@ -14,7 +14,7 @@ from burnBot_followSuggested import do_follow_suggested
 from burnBot_followGroup import do_follow_group
 from burnBot_followEngagers import do_follow_engagers
 from burnBot_randomActions import do_random_action
-from burnBot_client_log import client_log_line, action_combo_slug, action_target_label, summarize_issue_log
+from burnBot_client_log import client_log_line, action_target_label, summarize_issue_log
 from burnBot_run_log import set_session_context, clear_session_context, capture_failure_context, report_failure, flush_session_log, debug_line
 import burnBot_status as status_store
 
@@ -124,7 +124,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
     unfollow_days = int(settings.get("unfollow_days", 30) or 30)
     action_topics = settings.get("topics") or ""
 
-    # Account group / target accounts for follow[group] action
+    # Account group / target accounts for the follow-group actions
     account_list_tab = settings.get("account_group") or ""
     account_group_mode = (settings.get("account_group_mode") or "manual").strip().lower()
 
@@ -383,7 +383,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                                         moduleWarningsLog += _warns
                                     _ran = True
 
-                                elif _act_type == "follow" and _act_target in ["account list [post engagers]", "topics [post engagers]", "post engagers [topics]", "post engagers [account list]"]:
+                                elif _act_type == "follow" and _act_target in ["account list [likers]", "topics [likers]", "account list [post engagers]", "topics [post engagers]", "post engagers [topics]", "post engagers [account list]"]:
                                     _mode = "topics" if "topics" in _act_target else "accounts"
                                     _seeds = action_topics if _mode == "topics" else account_list_tab
                                     if _seeds or _mode == "accounts":

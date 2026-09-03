@@ -1,7 +1,7 @@
 # burnBot_followFilter.py
 #
 # Shared candidate screening for every follow action (suggested, account list,
-# post engagers). One place for:
+# likers). One place for:
 #   - the known-handle set (previous follow targets + universal ignore list),
 #     lowercased on both sides so the dedupe actually matches DOM handles;
 #   - reading the profile hover card that opens when a username is hovered

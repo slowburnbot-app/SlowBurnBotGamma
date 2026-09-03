@@ -296,8 +296,10 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
     # log through their own module's _p — point those at this action's log pane too.
     _fg._p = _p
     _lpt._p = _p
-    _scope = log_scope or "follow-engagers"
+    _scope = log_scope or "follow-likers"
     _lbl = f"{action_label}-" if action_label else ""
+    # Fallback error prefix matches the real log label family (mode is known here).
+    _fallback_label = f"follow[likers-{mode}]"
     _done_lbl = (action_label[0].upper() + action_label[1:]) if action_label else "Done"
 
     followed_count = 0
@@ -323,7 +325,7 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
             what = "topics" if mode == "topics" else "target accounts"
             msg = f"[error] no {what} configured"
             _p(client_log_line(account, _scope, f"{_lbl}{msg}"))
-            module_errors_log += f"{action_label or 'follow[engagers]'}: {msg}\n"
+            module_errors_log += f"{action_label or _fallback_label}: {msg}\n"
             return 0, module_errors_log, module_warnings_log
 
         for seed_entry in seed_list:
@@ -337,10 +339,10 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                 _p(client_log_line(account, _scope, f"{_lbl}searching topic [{seed}]"))
                 result = _open_topic_search_results(driver, account, seed, account_id=account_id)
                 if result == "restricted":
-                    module_warnings_log += f"{action_label or 'follow[engagers]'}: [warning] topic [{seed}] hidden by Instagram (age-restricted search)\n"
+                    module_warnings_log += f"{action_label or _fallback_label}: [warning] topic [{seed}] hidden by Instagram (age-restricted search)\n"
                     continue
                 if not result:
-                    module_errors_log += f"{action_label or 'follow[engagers]'}: [error] could not open search results for [{seed}]\n"
+                    module_errors_log += f"{action_label or _fallback_label}: [error] could not open search results for [{seed}]\n"
                     continue
                 post_links = _collect_post_links(driver, _POSTS_PER_TOPIC, include_reels=False)
             else:
@@ -352,14 +354,14 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                 if driver.find_elements(By.XPATH, "//*[contains(text(), \"Sorry, this page isn't available.\")]"):
                     msg = f"Target account '{seed}' not found"
                     _p(client_log_line(account, _scope, f"{_lbl}ERROR: {msg}"))
-                    module_errors_log += f"{action_label or 'follow[engagers]'}: {msg}\n"
+                    module_errors_log += f"{action_label or _fallback_label}: {msg}\n"
                     finish_seed_use(apiClient, seed_entry, None, account_rate, account, _scope, _lbl, _p, retire_reason="not found")
                     continue
                 post_links = _collect_post_links(driver, _POSTS_PER_ACCOUNT, include_reels=True)
 
             if not post_links:
                 _p(client_log_line(account, _scope, f"{_lbl}Warning: no posts found for [{seed}]"))
-                module_warnings_log += f"{action_label or 'follow[engagers]'}: [warning] no posts found for [{seed}]\n"
+                module_warnings_log += f"{action_label or _fallback_label}: [warning] no posts found for [{seed}]\n"
                 continue
             _p(client_log_line(account, _scope, f"{_lbl}[{seed}] {len(post_links)} post(s) to mine"))
 
@@ -396,17 +398,17 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
 
             if seed_dialogs == 0 and not status_store.is_bot_paused():
                 # Every post refused a likers dialog — the seed hides like counts (or the
-                # pages failed). Same treatment as follow[group]'s zero-yield target: mark it
+                # pages failed). Same treatment as followGroup's zero-yield target: mark it
                 # 100% saturated so the pool damps it now and retires it on the next dry use.
                 msg = f"[{seed}] no likes link on {len(post_links)} post(s) - like counts hidden?"
                 _p(client_log_line(account, _scope, f"{_lbl}Warning: {msg} - trying next seed"))
-                module_warnings_log += f"{action_label or 'follow[engagers]'}: {msg}\n"
+                module_warnings_log += f"{action_label or _fallback_label}: {msg}\n"
                 if mode != "topics":
                     finish_seed_use(apiClient, seed_entry, _ZERO_YIELD_SATURATION, account_rate, account, _scope, _lbl, _p)
                 continue
 
             module_warnings_log += _saturation_warning(
-                account, _scope, _lbl, action_label, seed, seed_known, seed_filtered, seed_followed,
+                account, _scope, _lbl, action_label or _fallback_label, seed, seed_known, seed_filtered, seed_followed,
             )
             if mode != "topics":
                 finish_seed_use(
@@ -417,13 +419,13 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
         if followed_count < target_count:
             _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{followed_count}/{target_count}]"))
             if followed_count == 0:
-                module_errors_log += f"{action_label or 'follow[engagers]'}: [error] no likers followed (0/{target_count})\n"
+                module_errors_log += f"{action_label or _fallback_label}: [error] no likers followed (0/{target_count})\n"
             else:
-                module_warnings_log += f"{action_label or 'follow[engagers]'}: [warning] limited likers found ({followed_count}/{target_count})\n"
+                module_warnings_log += f"{action_label or _fallback_label}: [warning] limited likers found ({followed_count}/{target_count})\n"
         else:
             _p(client_log_line(account, _scope, f"{_done_lbl}-Completed[{followed_count}/{target_count}]"))
 
     except Exception as e:
-        module_errors_log += process_exception(True, f"follow engagers failed: {e}", True, True)
+        module_errors_log += process_exception(True, f"follow likers failed: {e}", True, True)
 
     return followed_count, module_errors_log, module_warnings_log
