@@ -477,6 +477,7 @@ export interface SubscriptionInfo {
   current_clients: number;
   current_period_end: string | null;
   tiers: TierInfo[];
+  has_stripe_customer: boolean;
 }
 
 export interface UserConfig {

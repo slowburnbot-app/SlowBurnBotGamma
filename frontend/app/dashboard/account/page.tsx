@@ -132,11 +132,13 @@ export default function AccountPage() {
   }, []);
 
   const statusOk = info?.status === "active" || info?.status === "trialing";
-  // A real, billable Stripe subscription (vs. free/never-subscribed, or an
-  // internal invite trial that has no Stripe subscription behind it) —
-  // plan changes for these go through the Customer Portal, not Checkout.
-  const hasBillableSubscription =
-    info?.status === "active" || info?.status === "past_due";
+  // Whether this account has a real Stripe customer behind it — an
+  // admin-activated or invite-trial account can be "active"/"trialing"
+  // with no Stripe link at all, so status alone can't tell us this. Plan
+  // changes for a real Stripe customer go through the Customer Portal;
+  // everyone else (including a demo/trial account adding payment for the
+  // first time) goes through Checkout.
+  const hasBillableSubscription = info?.has_stripe_customer ?? false;
 
   async function handlePlanAction(tier: string) {
     setBusy(tier);
@@ -229,8 +231,22 @@ export default function AccountPage() {
                         <td className={`px-[6px] py-2 ${isCurrent ? "text-base05" : "text-base04"}`}>{tier.max_accounts}</td>
                         <td className={`px-[6px] py-2 ${isCurrent ? "text-base05" : "text-base04"}`}>{tier.max_clients}</td>
                         <td className="px-[6px] py-2 text-right">
-                          {isCurrent ? (
+                          {isCurrent && hasBillableSubscription ? (
                             <Bracket className="text-base0e">current plan</Bracket>
+                          ) : isCurrent ? (
+                            // Current tier, but no Stripe customer yet (demo
+                            // / admin-activated / invite-trial account) —
+                            // offer to start paying for the plan it's
+                            // already on, not just switching tiers.
+                            <button
+                              onClick={() => handlePlanAction(tier.name)}
+                              disabled={busy !== null}
+                              className="group cursor-pointer transition-colors disabled:opacity-50"
+                            >
+                              <Bracket className="text-base04 group-hover:text-base05">
+                                {busy === tier.name ? "..." : "add payment"}
+                              </Bracket>
+                            </button>
                           ) : (
                             <button
                               onClick={() => handlePlanAction(tier.name)}

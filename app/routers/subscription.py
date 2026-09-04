@@ -36,6 +36,12 @@ class SubscriptionInfoRead(BaseModel):
     current_clients: int
     current_period_end: str | None = None
     tiers: list[TierInfo]
+    # Whether this account has a real Stripe Customer behind it — status
+    # alone can't tell you that (an admin-activated or invite-trial account
+    # is "active"/"trialing" with no Stripe link at all). Frontend uses this
+    # to decide Checkout (no Stripe customer yet) vs. Billing Portal (one
+    # exists) — mirrors exactly what /subscription/portal itself checks.
+    has_stripe_customer: bool
 
 
 @router.get("/me", response_model=SubscriptionInfoRead)
@@ -82,6 +88,7 @@ async def get_subscription_info(
         current_clients=current_clients,
         current_period_end=period_end,
         tiers=tiers,
+        has_stripe_customer=bool(subscription and subscription.stripe_customer_id),
     )
 
 
