@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     github_repo: str = ""  # "owner/repo"
 
     # GHCR — Linux Docker image delivery
-    ghcr_namespace: str = ""  # e.g. "ghcr.io/bishopmartin/slowburnbotgamma"
+    ghcr_namespace: str = ""  # e.g. "ghcr.io/slowburnbot-app/slowburnbotgamma"
 
     # Railway S3-compatible object storage — generic release artifact hosting
     bucket_endpoint_url: str = ""   # e.g. "https://<id>.us-east-1.s3.amazonaws.com"
