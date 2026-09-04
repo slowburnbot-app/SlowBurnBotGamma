@@ -34,6 +34,29 @@ if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
   exit 1
 fi
 
+# git push retry — 2026-09-04: a release backgrounded via the Claude Code
+# Bash tool hit "Invalid username or token" from GitHub on both pushes back
+# to back, then succeeded immediately on retry with an identical
+# environment (same HOME, same gh credential-helper resolution) — a
+# transient auth/network blip, not anything foreground/background-specific.
+# A short retry absorbs that instead of aborting the whole release on it.
+_push_with_retry() {
+  local max_attempts=3 delay=5 attempt=1
+  while true; do
+    if git push "$@"; then
+      return 0
+    fi
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "error: git push $* failed after ${max_attempts} attempts" >&2
+      return 1
+    fi
+    echo "  ... git push $* failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s" >&2
+    sleep "$delay"
+    attempt=$(( attempt + 1 ))
+    delay=$(( delay * 2 ))
+  done
+}
+
 BOT_VERSION=$(python3 -c "
 import re, sys
 m = re.search(r'BOT_VERSION\s*=\s*[\"\']([\d.]+)[\"\']', open('bot-client/burnBot_version.py').read())
@@ -52,11 +75,11 @@ else
 fi
 
 # Push main branch first so sync endpoint reads current BOT_VERSION from HEAD
-git push origin main
+_push_with_retry origin main || exit 1
 echo "==> Pushed main branch."
 
 # Push tag (triggers GitHub Actions build)
-git push origin "$TAG"
+_push_with_retry origin "$TAG" || exit 1
 echo "==> Pushed ${TAG} — GitHub Actions build triggered (~3-4 min)."
 
 # Authenticate
