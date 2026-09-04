@@ -41,18 +41,61 @@ def _price_to_tier_map() -> dict[str, str]:
     }
 
 
+def price_id_for_tier(tier: str) -> str | None:
+    """Inverse of _price_to_tier_map — the configured Stripe price id for a
+    plan tier, or None if that tier has no price configured."""
+    for price_id, mapped_tier in _price_to_tier_map().items():
+        if mapped_tier == tier and price_id:
+            return price_id
+    return None
+
+
+def _subscription_items(stripe_sub) -> list:
+    """The subscription's line items list.
+
+    Deliberately dict-style (`stripe_sub["items"]`), not attribute access
+    (`stripe_sub.items`) — Stripe SDK objects are dict-like, so `.items` on
+    one resolves to Python's built-in `dict.items` bound method rather than
+    ever reaching the actual Stripe "items" field via __getattr__. That
+    collision silently returned "no items" for every subscription here,
+    which is why price->tier mapping via webhook has never worked.
+    """
+    items = stripe_sub.get("items") if hasattr(stripe_sub, "get") else None
+    data = items.get("data") if items else None
+    return data or []
+
+
 def _tier_from_stripe_sub(stripe_sub) -> str | None:
     mapping = _price_to_tier_map()
-    items = getattr(stripe_sub, "items", None)
-    data = getattr(items, "data", None) if items else None
-    if not data:
-        return None
-    for item in data:
+    for item in _subscription_items(stripe_sub):
         price = getattr(item, "price", None)
         price_id = getattr(price, "id", None) if price else None
         if price_id and price_id in mapping and mapping[price_id]:
             return mapping[price_id]
     return None
+
+
+def _current_period(stripe_sub) -> tuple[int | None, int | None]:
+    """(current_period_start, current_period_end) as unix timestamps.
+
+    Newer Stripe API versions (this account is on 2026-08-26.dahlia) dropped
+    these off the top-level Subscription object — each subscription item now
+    carries its own period, since a subscription can mix items with
+    different billing cycles. We only ever create single-item subscriptions
+    (one price per plan tier), so the first item's period is authoritative.
+    Older API versions still set the top-level fields, so check those first
+    for backward compatibility.
+    """
+    start = getattr(stripe_sub, "current_period_start", None)
+    end = getattr(stripe_sub, "current_period_end", None)
+    if start and end:
+        return start, end
+
+    items = _subscription_items(stripe_sub)
+    if items:
+        first = items[0]
+        return getattr(first, "current_period_start", None), getattr(first, "current_period_end", None)
+    return None, None
 
 
 async def apply_stripe_subscription(
@@ -117,8 +160,9 @@ async def apply_stripe_subscription(
     sub.stripe_subscription_id = stripe_sub.id
     sub.stripe_customer_id = stripe_sub.customer
     sub.status = incoming_status
-    sub.current_period_start = stripe_ts_to_datetime(stripe_sub.current_period_start)
-    sub.current_period_end = stripe_ts_to_datetime(stripe_sub.current_period_end)
+    period_start, period_end = _current_period(stripe_sub)
+    sub.current_period_start = stripe_ts_to_datetime(period_start)
+    sub.current_period_end = stripe_ts_to_datetime(period_end)
 
     if incoming_status in TERMINAL_STATUSES:
         # sub.plan_tier is left untouched (mirrors admin.py's deactivate) so a

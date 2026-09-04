@@ -1,5 +1,7 @@
 """Customer-facing subscription info."""
-from fastapi import APIRouter, Depends
+import stripe
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +13,9 @@ from app.models.account import Account
 from app.models.desktop_build import DesktopBuild
 from app.models.subscription import Subscription
 from app.models.user import User
-from app.plan_tiers import PLAN_TIERS, get_max_accounts, get_max_clients
+from app.plan_tiers import PLAN_TIERS, get_max_accounts, get_max_clients, is_valid_tier
+from app.services.stripe_sync import price_id_for_tier
+from app.settings import settings
 
 router = APIRouter(prefix="/subscription", tags=["subscription"])
 
@@ -79,3 +83,97 @@ async def get_subscription_info(
         current_period_end=period_end,
         tiers=tiers,
     )
+
+
+class CheckoutRequest(BaseModel):
+    plan_tier: str
+
+
+class RedirectUrl(BaseModel):
+    url: str
+
+
+@router.post("/checkout", response_model=RedirectUrl)
+async def create_checkout_session(
+    body: CheckoutRequest,
+    user: User = Depends(current_active_user),
+    subscription: Subscription | None = Depends(get_active_subscription),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Start a new paid subscription via Stripe-hosted Checkout.
+
+    For plan changes on an existing paid subscription, use the Customer
+    Portal (`/subscription/portal`) instead — Checkout always creates a new
+    Stripe subscription, so running it against an account that already has
+    one would leave the customer with two.
+    """
+    if not settings.stripe_secret_key:
+        raise HTTPException(status_code=503, detail="Stripe not configured.")
+
+    if not is_valid_tier(body.plan_tier):
+        raise HTTPException(status_code=400, detail=f"Invalid tier: {body.plan_tier}")
+
+    price_id = price_id_for_tier(body.plan_tier)
+    if not price_id:
+        raise HTTPException(status_code=503, detail=f"No Stripe price configured for tier: {body.plan_tier}")
+
+    if subscription is None:
+        subscription = Subscription(user_id=user.id)
+        session.add(subscription)
+
+    if subscription.stripe_subscription_id and subscription.status in ("active", "trialing", "past_due"):
+        raise HTTPException(
+            status_code=400,
+            detail="Already subscribed — use the billing portal to change plans.",
+        )
+
+    stripe.api_key = settings.stripe_secret_key
+
+    # Lazily create (and persist) the Stripe Customer before redirecting, so
+    # the webhook that lands after checkout can find this row by
+    # stripe_customer_id on the very first subscription — apply_stripe_sub
+    # -scription's lookup has nothing else to match on a brand-new customer.
+    if not subscription.stripe_customer_id:
+        customer = await run_in_threadpool(
+            stripe.Customer.create, email=user.email, metadata={"user_id": str(user.id)}
+        )
+        subscription.stripe_customer_id = customer.id
+        await session.commit()
+
+    checkout_session = await run_in_threadpool(
+        stripe.checkout.Session.create,
+        mode="subscription",
+        customer=subscription.stripe_customer_id,
+        client_reference_id=str(user.id),
+        line_items=[{"price": price_id, "quantity": 1}],
+        success_url=f"{settings.frontend_base_url}/dashboard/account?checkout=success",
+        cancel_url=f"{settings.frontend_base_url}/dashboard/account?checkout=cancel",
+        # Managed Payments is on by default for this account and requires a
+        # product tax code on every line item otherwise. We're handling tax
+        # ourselves (Stripe Tax threshold monitoring, not active collection
+        # yet) rather than opting into Managed Payments, so turn it off here.
+        managed_payments={"enabled": False},
+    )
+    return RedirectUrl(url=checkout_session.url)
+
+
+@router.post("/portal", response_model=RedirectUrl)
+async def create_portal_session(
+    user: User = Depends(current_active_user),
+    subscription: Subscription | None = Depends(get_active_subscription),
+):
+    """Open the Stripe Customer Portal for self-serve upgrade/downgrade,
+    cancellation, and payment-method updates on an existing subscription."""
+    if not settings.stripe_secret_key:
+        raise HTTPException(status_code=503, detail="Stripe not configured.")
+
+    if subscription is None or not subscription.stripe_customer_id:
+        raise HTTPException(status_code=404, detail="No Stripe customer on record yet.")
+
+    stripe.api_key = settings.stripe_secret_key
+    portal_session = await run_in_threadpool(
+        stripe.billing_portal.Session.create,
+        customer=subscription.stripe_customer_id,
+        return_url=f"{settings.frontend_base_url}/dashboard/account",
+    )
+    return RedirectUrl(url=portal_session.url)

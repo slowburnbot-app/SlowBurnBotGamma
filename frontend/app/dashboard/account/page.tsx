@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSubscriptionInfo, SubscriptionInfo } from "@/lib/api";
+import { createCheckoutSession, createPortalSession, getSubscriptionInfo, SubscriptionInfo } from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
 import { ACTIVE_THEME } from "@/lib/active-theme";
 import { getStoredTheme, setStoredTheme, applyThemeCss } from "@/lib/theme-store";
@@ -124,12 +124,45 @@ function ThemeSelector() {
 
 export default function AccountPage() {
   const [info, setInfo] = useState<SubscriptionInfo | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
     getSubscriptionInfo().then(setInfo).catch(() => {});
   }, []);
 
   const statusOk = info?.status === "active" || info?.status === "trialing";
+  // A real, billable Stripe subscription (vs. free/never-subscribed, or an
+  // internal invite trial that has no Stripe subscription behind it) —
+  // plan changes for these go through the Customer Portal, not Checkout.
+  const hasBillableSubscription =
+    info?.status === "active" || info?.status === "past_due";
+
+  async function handlePlanAction(tier: string) {
+    setBusy(tier);
+    setMsg("");
+    try {
+      const { url } = hasBillableSubscription
+        ? await createPortalSession()
+        : await createCheckoutSession(tier);
+      window.location.href = url;
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Something went wrong.");
+      setBusy(null);
+    }
+  }
+
+  async function handleManageBilling() {
+    setBusy("portal");
+    setMsg("");
+    try {
+      const { url } = await createPortalSession();
+      window.location.href = url;
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Something went wrong.");
+      setBusy(null);
+    }
+  }
 
   return (
     <div className="space-y-6 font-mono">
@@ -141,7 +174,16 @@ export default function AccountPage() {
         {info ? (
           <>
             <div className="border border-base03">
-              <div className="border-b border-base03 px-[6px] py-2 bg-base01 text-base04">current plan</div>
+              <div className="border-b border-base03 px-[6px] py-2 bg-base01 text-base04 flex items-center justify-between">
+                <span>current plan</span>
+                {hasBillableSubscription && (
+                  <button onClick={handleManageBilling} disabled={busy !== null} className="group cursor-pointer transition-colors disabled:opacity-50">
+                    <Bracket className="text-base04 group-hover:text-base05">
+                      {busy === "portal" ? "..." : "manage billing"}
+                    </Bracket>
+                  </button>
+                )}
+              </div>
               <div className="px-[6px] py-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="text-base05 font-semibold capitalize">{info.plan_tier}</span>
                 <span className="text-base03">—</span>
@@ -158,6 +200,7 @@ export default function AccountPage() {
                 )}
               </div>
             </div>
+            {msg && <p className="text-status-bad text-sm">{msg}</p>}
 
             <h2 className="font-semibold text-base05">available plans</h2>
             <div className="border border-base03">
@@ -188,10 +231,16 @@ export default function AccountPage() {
                         <td className="px-[6px] py-2 text-right">
                           {isCurrent ? (
                             <Bracket className="text-base0e">current plan</Bracket>
-                          ) : isUpgrade ? (
-                            <Bracket className="text-base04">upgrade</Bracket>
                           ) : (
-                            <Bracket className="text-base04">downgrade</Bracket>
+                            <button
+                              onClick={() => handlePlanAction(tier.name)}
+                              disabled={busy !== null}
+                              className="group cursor-pointer transition-colors disabled:opacity-50"
+                            >
+                              <Bracket className="text-base04 group-hover:text-base05">
+                                {busy === tier.name ? "..." : isUpgrade ? "upgrade" : "downgrade"}
+                              </Bracket>
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -200,7 +249,6 @@ export default function AccountPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-base04 text-sm">To change your plan, please contact the administrator.</p>
           </>
         ) : (
           <p className="text-base04">loading...</p>

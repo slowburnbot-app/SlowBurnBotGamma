@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     stripe_price_walk: str = ""
     stripe_price_run: str = ""
 
+    # Base URL of the Next.js frontend — used to build Checkout/Customer
+    # Portal success/cancel/return redirect URLs.
+    frontend_base_url: str = "https://www.slowburnbot.com"
+
     # CORS (set once Next.js is deployed)
     cors_origins: list[str] = []
 

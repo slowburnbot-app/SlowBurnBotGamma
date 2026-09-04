@@ -107,6 +107,17 @@ export async function getSubscriptionInfo() {
   return request<SubscriptionInfo>("/subscription/me");
 }
 
+export async function createCheckoutSession(planTier: string) {
+  return request<{ url: string }>("/subscription/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan_tier: planTier }),
+  });
+}
+
+export async function createPortalSession() {
+  return request<{ url: string }>("/subscription/portal", { method: "POST" });
+}
+
 // Config
 export async function getUserConfig() {
   return request<UserConfig>("/config");
