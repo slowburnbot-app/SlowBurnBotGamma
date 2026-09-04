@@ -144,8 +144,14 @@ export async function adminSyncSubscription(userId: string) {
   return request(`/admin/users/${userId}/sync-subscription`, { method: "POST" });
 }
 
-export async function adminActivateSubscription(userId: string) {
-  return request<{ status: string; plan_tier: string }>(`/admin/users/${userId}/activate`, { method: "POST" });
+export async function adminActivateSubscription(userId: string, trialDays?: number) {
+  return request<{ status: string; plan_tier: string; current_period_end: string | null }>(
+    `/admin/users/${userId}/activate`,
+    {
+      method: "POST",
+      body: trialDays ? JSON.stringify({ trial_days: trialDays }) : undefined,
+    }
+  );
 }
 
 export async function adminDeactivateSubscription(userId: string) {

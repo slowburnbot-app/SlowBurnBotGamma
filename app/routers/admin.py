@@ -1,7 +1,7 @@
 """Admin-only endpoints."""
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -83,6 +83,12 @@ async def sync_subscription(
 
 class ActivateSubscriptionRequest(BaseModel):
     plan_tier: str | None = None
+    # When set, grants a timed trial instead of a plain activation — mirrors
+    # the invite-code trial mechanism (status="trialing", current_period_end
+    # = now + trial_days) for an account that's already registered, e.g. a
+    # demo account that later needs "reactivate as a trial" rather than
+    # "activate with no end date."
+    trial_days: int | None = None
 
 
 @router.post("/users/{user_id}/activate")
@@ -94,7 +100,10 @@ async def activate_subscription(
 ):
     """Admin-activate a user's subscription. Tier comes from the request body
     if provided; otherwise the existing Subscription.plan_tier is used. Either
-    way the resulting tier must be a valid PLAN_TIERS key."""
+    way the resulting tier must be a valid PLAN_TIERS key.
+
+    With trial_days set, status becomes "trialing" with current_period_end
+    pushed out that many days, instead of "active" with no period end."""
     result = await session.execute(
         select(Subscription).where(Subscription.user_id == user_id)
     )
@@ -110,7 +119,14 @@ async def activate_subscription(
             detail=f"Cannot activate: tier '{target_tier}' is not valid. Set a tier first.",
         )
 
-    sub.status = "active"
+    trial_days = body.trial_days if body else None
+    if trial_days is not None:
+        if trial_days <= 0:
+            raise HTTPException(status_code=400, detail="trial_days must be positive.")
+        sub.status = "trialing"
+        sub.current_period_end = datetime.now(timezone.utc) + timedelta(days=trial_days)
+    else:
+        sub.status = "active"
     sub.plan_tier = target_tier
 
     user_result = await session.execute(select(User).where(User.id == user_id))
@@ -120,7 +136,11 @@ async def activate_subscription(
 
     await enforce_account_limits(user_id, session)
     await session.commit()
-    return {"status": sub.status, "plan_tier": sub.plan_tier}
+    return {
+        "status": sub.status,
+        "plan_tier": sub.plan_tier,
+        "current_period_end": sub.current_period_end.isoformat() if sub.current_period_end else None,
+    }
 
 
 @router.post("/users/{user_id}/deactivate")

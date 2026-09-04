@@ -51,12 +51,27 @@ export default function AdminPage() {
     try {
       const action = user.subscription_status === "active"
         ? adminDeactivateSubscription
-        : adminActivateSubscription;
+        : (id: string) => adminActivateSubscription(id);
       const res = await action(user.id);
       setMsg(`${user.email} — ${res.status} / ${res.plan_tier}`);
       await loadUsers();
     } catch (err: unknown) {
       setMsg(err instanceof Error ? err.message : "toggle failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleGrantTrial(user: AdminUser) {
+    setBusy(user.id);
+    setMsg("");
+    try {
+      const res = await adminActivateSubscription(user.id, 30);
+      const until = res.current_period_end ? new Date(res.current_period_end).toLocaleDateString() : "?";
+      setMsg(`${user.email} — 30-day trial (${res.plan_tier}) until ${until}`);
+      await loadUsers();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "trial grant failed.");
     } finally {
       setBusy(null);
     }
@@ -128,6 +143,15 @@ export default function AdminPage() {
                     >
                       <Bracket className={u.subscription_status === "active" ? "text-base04 group-hover:text-base05" : "text-status-ok group-hover:text-base05"}>
                         {busy === u.id ? "..." : u.subscription_status === "active" ? "deactivate" : "activate"}
+                      </Bracket>
+                    </button>
+                    <button
+                      onClick={() => handleGrantTrial(u)}
+                      disabled={busy === u.id}
+                      className="group disabled:opacity-50 transition-colors"
+                    >
+                      <Bracket className="text-base0e group-hover:text-base05">
+                        {busy === u.id ? "..." : "trial 30d"}
                       </Bracket>
                     </button>
                     <button
