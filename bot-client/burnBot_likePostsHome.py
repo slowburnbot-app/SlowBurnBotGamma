@@ -8,9 +8,17 @@ from burnBot_login import check_phone_verification, switch_login
 from burnBot_accountSession_setup import is_bot_debug_enabled
 from burnBot_client_log import client_log_line
 from burnBot_run_log import debug_line
+from burnBot_likePostsTopic import _normalize_post_path
 import random
 import time
 import burnBot_status as status_store
+
+# Bound on the whole home-feed like pass, mirroring like[topics]'s
+# _TOPIC_BUDGET_S — a feed stuck re-rendering the same post used to burn the
+# full max_scrolls budget (~5.5 min, 0 likes) before v1.196 (see the
+# 2026-09-04 thistlefinchdistillery run: [@richjohnsonarts] re-picked 30x).
+_HOME_BUDGET_S = 120
+_HOME_MAX_NO_PROGRESS_PASSES = 3
 
 _p = _builtins.print  # set per-call by do_like_posts_home; safe because sessions run sequentially
 
@@ -28,6 +36,27 @@ _AD_CTA_XPATH = " | ".join(
     f".//*[(@role='button' or @role='link') and normalize-space()='{t}']"
     for t in _AD_CTA_TEXTS
 )
+
+
+def _article_key(article, article_account):
+    """Stable identity for a feed article: its /p/<shortcode>/ permalink,
+    falling back to the author handle when no permalink link is present.
+
+    Dedup used to key on WebElement identity (a plain list of elements seen
+    so far) — a React re-render of the *same* post yields a new element
+    reference, so an article whose like-button lookup timed out or errored
+    (never appended to that list) or whose DOM simply re-mounted would be
+    re-picked forever. v1.196, after the [@richjohnsonarts] home-feed stall.
+    """
+    try:
+        for anchor in article.find_elements(By.XPATH, ".//a[contains(@href,'/p/')]"):
+            href = anchor.get_attribute("href") or ""
+            path = _normalize_post_path(href)
+            if path.startswith("/p/"):
+                return path
+    except Exception:
+        pass
+    return f"author:{article_account}"
 
 
 def check_login(driver):
@@ -281,13 +310,17 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
         account_id: Account UUID (unused here, kept for consistent interface)
 
     Returns:
-        tuple: (likes_performed, errors_log)
+        tuple: (likes_performed, errors_log, warnings_log)
     """
     likes_performed = 0
     moduleErrorsLog = ""
+    moduleWarningsLog = ""
     max_scrolls = 30
     scrolls = 0
-    processed_articles = []  # Track processed articles to avoid duplicates
+    processed_urls = set()  # Track post permalinks (or author, as fallback) to avoid duplicates
+    no_progress_passes = 0
+    stall_handle = None
+    t0 = time.monotonic()
 
     # Load like_suggested and like_sponsored settings from API
     _user_cfg = apiClient.get_user_config() if apiClient else {}
@@ -315,168 +348,241 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
         target_formatted = f"{target_count:02d}"
         
         while likes_performed < target_count and scrolls < max_scrolls:
+            if time.monotonic() - t0 > _HOME_BUDGET_S:
+                _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{likes_performed}/{target_count}]"))
+                moduleWarningsLog += (
+                    f"like[homepage]: [warning] feed stalled"
+                    f"{f' on [@{stall_handle}]' if stall_handle else ''} - "
+                    f"budget of {_HOME_BUDGET_S}s exceeded ({likes_performed}/{target_count} likes)\n"
+                )
+                return likes_performed, moduleErrorsLog, moduleWarningsLog
+
             articles = driver.find_elements(By.TAG_NAME, 'article')
-            new_articles = [art for art in articles if art not in processed_articles]
-            
-            if len(new_articles) > 0:
-                for article in new_articles:
-                    if status_store.is_bot_paused():
-                        return likes_performed, moduleErrorsLog
-                    try:
-                        try:
-                            article_account = get_post_author_username(article)
-                        except Exception:
-                            article_account = "unknown"
 
-                        # No parseable header profile link means this article is
-                        # an ad or an unrecognized layout — never like blind
-                        # (v1.170's first-text-match extraction liked ads logged
-                        # as "[Learn more]"/caption text, and the ignore list
-                        # can't match a garbage name).
-                        if article_account == "unknown":
-                            _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [unknown-author]"))
-                            if is_bot_debug_enabled():
-                                try:
-                                    article_html = article.get_attribute("outerHTML")
-                                    debug_line(client_log_line(account, _scope, f"debug unknown-author article HTML: {article_html[:2000]}"))
-                                except Exception:
-                                    pass
-                            if article not in processed_articles:
-                                processed_articles.append(article)
-                            continue
+            # Identify which visible articles are genuinely new before doing
+            # any per-article work — a post that stays mounted in the DOM
+            # across scrolls must be a cheap, silent skip here (no scroll/
+            # sleep spent on it), the same as the old identity-based
+            # processed_articles list. Only articles new *this pass* go
+            # through the full skip/like logic below, where a scroll+sleep
+            # is now guaranteed on every exit path (fixes the old bug where
+            # a skip never advanced the feed).
+            new_articles = []  # [(article, article_account, article_key), ...]
+            for article in articles:
+                try:
+                    article_account = get_post_author_username(article)
+                except Exception:
+                    article_account = "unknown"
+                article_key = _article_key(article, article_account)
+                if article_key in processed_urls:
+                    continue
+                processed_urls.add(article_key)
+                new_articles.append((article, article_account, article_key))
 
+            pass_had_new_article = len(new_articles) > 0
+            likes_at_pass_start = likes_performed
 
-                        # Skip suggested posts if like_suggested is disabled
-                        if not like_suggested:
+            for article, article_account, article_key in new_articles:
+                if status_store.is_bot_paused():
+                    return likes_performed, moduleErrorsLog, moduleWarningsLog
+                try:
+                    stall_handle = article_account if article_account != "unknown" else stall_handle
+
+                    # No parseable header profile link means this article is
+                    # an ad or an unrecognized layout — never like blind
+                    # (v1.170's first-text-match extraction liked ads logged
+                    # as "[Learn more]"/caption text, and the ignore list
+                    # can't match a garbage name).
+                    if article_account == "unknown":
+                        _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [unknown-author]"))
+                        if is_bot_debug_enabled():
                             try:
-                                is_suggested = (
-                                    "Suggested for you" in article.text or
-                                    len(article.find_elements(By.XPATH, ".//div[@role='button' and text()='Follow']")) > 0
-                                )
-                                if is_suggested:
-                                    display_name = article_account[:15] if len(article_account) > 15 else article_account
-                                    _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [suggested]"))
-                                    if article not in processed_articles:
-                                        processed_articles.append(article)
-                                    continue
-                            except:
+                                article_html = article.get_attribute("outerHTML")
+                                debug_line(client_log_line(account, _scope, f"debug unknown-author article HTML: {article_html[:2000]}"))
+                            except Exception:
                                 pass
+                        continue
 
-                        # Skip sponsored posts if like_sponsored is disabled
-                        if not like_sponsored:
-                            try:
-                                article_inner_text = driver.execute_script(
-                                    "return arguments[0].innerText || ''", article
-                                )
-                                is_ad = 'Sponsored' in article_inner_text
-
-                                if not is_ad:
-                                    is_ad = len(article.find_elements(
-                                        By.XPATH, ".//*[contains(@href,'/ads/about')]"
-                                    )) > 0
-
-                                if not is_ad:
-                                    cta_hits = article.find_elements(By.XPATH, _AD_CTA_XPATH)
-                                    if cta_hits:
-                                        is_ad = True
-                                        if is_bot_debug_enabled():
-                                            debug_line(client_log_line(account, _scope, f"debug @{article_account} ad via CTA button"))
-
-                                if is_bot_debug_enabled():
-                                    debug_line(client_log_line(account, _scope, f"debug @{article_account} is_ad={is_ad}"))
-                                    if not is_ad:
-                                        article_html = article.get_attribute("outerHTML")
-                                        debug_line(client_log_line(account, _scope, f"debug article HTML snippet: {article_html[:800]}"))
-
-                                if is_ad:
-                                    display_name = article_account[:15] if len(article_account) > 15 else article_account
-                                    _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [sponsored]"))
-                                    if article not in processed_articles:
-                                        processed_articles.append(article)
-                                    continue
-                            except Exception as e:
-                                debug_line(client_log_line(account, _scope, f"debug sponsored check error: {e}"))
-
-                        # Check if account is on ignore list
-                        if article_account in ignore_list:
-                            display_name = article_account[:15] if len(article_account) > 15 else article_account
-                            _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [ignored]"))
-                            if article not in processed_articles:
-                                processed_articles.append(article)
-                            continue
-                        
-                        like_box = WebDriverWait(article, 10).until(
-                            EC.presence_of_element_located((By.CLASS_NAME, "xyb1xck"))
-                        )
-                        like_status = like_box.get_attribute("aria-label")
-                        
-                        if like_status == "Like":
-                            display_name = article_account[:15] if len(article_account) > 15 else article_account
-
-                            like_button = WebDriverWait(article, 5).until(
-                                EC.element_to_be_clickable((By.CSS_SELECTOR, "svg[aria-label='Like']"))
+                    # Skip suggested posts if like_suggested is disabled
+                    if not like_suggested:
+                        try:
+                            is_suggested = (
+                                "Suggested for you" in article.text or
+                                len(article.find_elements(By.XPATH, ".//div[@role='button' and text()='Follow']")) > 0
                             )
-                            hhover(driver, article)
-                            hclick(driver, like_button)
-
-                            # Count the like only after the heart actually flips
-                            # (2026-08-13: an entire topics action's clicks
-                            # silently failed to register — click-and-count
-                            # would have reported 6/6 while liking nothing).
-                            # Scoped to the action-bar <section> so a comment
-                            # heart can't satisfy the check.
-                            try:
-                                WebDriverWait(article, 6).until(
-                                    lambda a: len(a.find_elements(
-                                        By.XPATH,
-                                        ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Unlike']]"
-                                    )) > 0
-                                )
-                                likes_performed += 1
-                                count_formatted = f"{likes_performed:02d}"
-                                _p(client_log_line(account, _scope, f"{_lbl}[{count_formatted}/{target_formatted}] - [{display_name}]"))
-                            except TimeoutException:
-                                debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_state_unchanged"))
-
-                            hsleep(6, 8)
-                        else:
-                            if like_status:
+                            if is_suggested:
                                 display_name = article_account[:15] if len(article_account) > 15 else article_account
-                                _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [already liked]"))
-                        
-                        if article not in processed_articles:
-                            processed_articles.append(article)
-                        
-                        if likes_performed >= target_count:
-                            break
-                    
-                    except (NoSuchElementException, StaleElementReferenceException) as error:
-                        noteError = "Article element error (stale/not found)"
-                        moduleErrorsLog += process_exception(False, noteError, False, False)
-                        pass
+                                _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [suggested]"))
+                                continue
+                        except:
+                            pass
+
+                    # Skip sponsored posts if like_sponsored is disabled
+                    if not like_sponsored:
+                        try:
+                            article_inner_text = driver.execute_script(
+                                "return arguments[0].innerText || ''", article
+                            )
+                            is_ad = 'Sponsored' in article_inner_text
+
+                            if not is_ad:
+                                is_ad = len(article.find_elements(
+                                    By.XPATH, ".//*[contains(@href,'/ads/about')]"
+                                )) > 0
+
+                            if not is_ad:
+                                cta_hits = article.find_elements(By.XPATH, _AD_CTA_XPATH)
+                                if cta_hits:
+                                    is_ad = True
+                                    if is_bot_debug_enabled():
+                                        debug_line(client_log_line(account, _scope, f"debug @{article_account} ad via CTA button"))
+
+                            if is_bot_debug_enabled():
+                                debug_line(client_log_line(account, _scope, f"debug @{article_account} is_ad={is_ad}"))
+                                if not is_ad:
+                                    article_html = article.get_attribute("outerHTML")
+                                    debug_line(client_log_line(account, _scope, f"debug article HTML snippet: {article_html[:800]}"))
+
+                            if is_ad:
+                                display_name = article_account[:15] if len(article_account) > 15 else article_account
+                                _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [sponsored]"))
+                                continue
+                        except Exception as e:
+                            debug_line(client_log_line(account, _scope, f"debug sponsored check error: {e}"))
+
+                    # Check if account is on ignore list
+                    if article_account in ignore_list:
+                        display_name = article_account[:15] if len(article_account) > 15 else article_account
+                        _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [ignored]"))
+                        continue
+
+                    display_name = article_account[:15] if len(article_account) > 15 else article_account
+
+                    # Like control lookup — section-scoped so a comment heart
+                    # (also role=button wrapping svg[aria-label='Like']) can't
+                    # be mistaken for the post's own like button, and matched
+                    # by aria-label rather than a hashed IG class (the old
+                    # "xyb1xck" class-name lookup silently no-op'd on at least
+                    # one feed-article DOM variant — v1.196, after the
+                    # [@richjohnsonarts] home-feed stall).
+                    if article.find_elements(
+                        By.XPATH,
+                        ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Unlike']]"
+                    ):
+                        _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{display_name}] - [already liked]"))
+                        continue
+
+                    try:
+                        like_button = WebDriverWait(article, 8).until(
+                            EC.presence_of_element_located((
+                                By.XPATH,
+                                ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Like']]"
+                            ))
+                        )
                     except TimeoutException:
+                        debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_button_timeout"))
+                        continue
+
+                    like_status = ""
+                    try:
+                        like_icon = like_button.find_element(By.XPATH, ".//*[local-name()='svg' and @aria-label='Like']")
+                        like_status = like_icon.get_attribute("aria-label") or ""
+                    except Exception:
+                        like_status = ""
+
+                    if like_status != "Like":
+                        debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=no_like_control status={like_status!r}"))
+                        continue
+
+                    hhover(driver, article)
+                    clicked = False
+                    try:
+                        hclick(driver, like_button)
+                        clicked = True
+                    except Exception:
                         pass
-                    
+
+                    if not clicked:
+                        try:
+                            driver.execute_script("arguments[0].click();", like_button)
+                            clicked = True
+                        except Exception:
+                            pass
+
+                    if not clicked:
+                        debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_click_failed"))
+                        continue
+
+                    # Count the like only after the heart actually flips
+                    # (2026-08-13: an entire topics action's clicks
+                    # silently failed to register — click-and-count
+                    # would have reported 6/6 while liking nothing).
+                    # Scoped to the action-bar <section> so a comment
+                    # heart can't satisfy the check.
+                    try:
+                        WebDriverWait(article, 6).until(
+                            lambda a: len(a.find_elements(
+                                By.XPATH,
+                                ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Unlike']]"
+                            )) > 0
+                        )
+                        likes_performed += 1
+                        count_formatted = f"{likes_performed:02d}"
+                        _p(client_log_line(account, _scope, f"{_lbl}[{count_formatted}/{target_formatted}] - [{display_name}]"))
+                    except TimeoutException:
+                        debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_state_unchanged"))
+
+                    hsleep(6, 8)
+
+                    if likes_performed >= target_count:
+                        break
+
+                except (NoSuchElementException, StaleElementReferenceException) as error:
+                    noteError = "Article element error (stale/not found)"
+                    moduleErrorsLog += process_exception(False, noteError, False, False)
+                    debug_line(client_log_line(account, _scope, f"skip @{article_account} reason={type(error).__name__}"))
+                finally:
                     hscroll(driver, 400)
                     hsleep(4, 6)
-                
-                if likes_performed >= target_count:
-                    break
-            
-            else:
+
+            if likes_performed >= target_count:
+                break
+
+            if not pass_had_new_article:
+                # Every currently-rendered article was already handled (or the
+                # feed rendered none at all) — reload to force fresh content,
+                # same recovery the original code used here.
                 _p(client_log_line(account, _scope, "reload (no articles)"))
                 driver.get('https://www.instagram.com/')
                 time.sleep(5)
-            
+
+            # No new article this pass and no likes landed — the feed isn't
+            # advancing (a stuck re-render, or IG holding the same batch).
+            # Bail after a few strikes instead of burning the full
+            # max_scrolls budget on one dead post.
+            if not pass_had_new_article and likes_performed == likes_at_pass_start:
+                no_progress_passes += 1
+                if no_progress_passes >= _HOME_MAX_NO_PROGRESS_PASSES:
+                    _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{likes_performed}/{target_count}]"))
+                    moduleWarningsLog += (
+                        f"like[homepage]: [warning] feed stalled"
+                        f"{f' on [@{stall_handle}]' if stall_handle else ''} after "
+                        f"{no_progress_passes} pass(es) with no progress "
+                        f"({likes_performed}/{target_count} likes)\n"
+                    )
+                    return likes_performed, moduleErrorsLog, moduleWarningsLog
+            else:
+                no_progress_passes = 0
+
             scrolls += 1
-        
+
         if likes_performed < target_count:
             _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{likes_performed}/{target_count}]"))
         else:
             _p(client_log_line(account, _scope, f"{_done_lbl}-Completed[{likes_performed}/{target_count}]"))
-    
+
     except Exception as error:
         noteError = f"do_like_posts_home catch all: {str(error)}"
         moduleErrorsLog += process_exception(True, noteError, True, False)
-    
-    return likes_performed, moduleErrorsLog
+
+    return likes_performed, moduleErrorsLog, moduleWarningsLog
