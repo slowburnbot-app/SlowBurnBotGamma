@@ -182,12 +182,13 @@ async def get_download_url(
     _: Subscription = Depends(require_active_subscription),
 ):
     """
-    Windows: return a short-lived signed URL to the generic release binary in object storage.
+    Windows/macOS: return a short-lived signed URL to the generic release binary in object storage.
     Linux: return docker run instructions with the activation token pre-filled.
     """
     build = await _get_owned_build(build_id, user, session)
+    system_type = _system_type(build)
 
-    if _system_type(build) == "linux":
+    if system_type == "linux":
         image_ref = f"{settings.ghcr_namespace}/slowburnbot-client:latest"
         # Activation token not returned here — it's shown on the build row at creation time
         cid = str(build.client_id).zfill(2)
@@ -213,7 +214,13 @@ async def get_download_url(
     # shows) so re-downloading an existing slot picks up new releases. The slot's own
     # provisioned version and -latest remain fallbacks. The sync-bot-version endpoint
     # only advances current_bot_version once SlowBurnBot-<version>.exe exists in the
-    # bucket, so that key is safe to prefer.
+    # bucket, so that key is safe to prefer on Windows. The macOS binary is not part
+    # of that gate, so on macOS every candidate may be missing — hence the 503 below.
+    if system_type == "macos":
+        prefix, ext, label = "releases/macos/", "", "macOS"
+    else:
+        prefix, ext, label = "releases/windows/", ".exe", "Windows"
+
     sc = await _get_system_config(session)
     candidate_keys: list[str] = []
     seen: set[str] = set()
@@ -224,26 +231,27 @@ async def get_download_url(
             candidate_keys.append(key)
 
     if sc.current_bot_version:
-        _add(f"releases/windows/SlowBurnBot-{sc.current_bot_version}.exe")
+        _add(f"{prefix}SlowBurnBot-{sc.current_bot_version}{ext}")
     if build.bot_version:
-        _add(f"releases/windows/SlowBurnBot-{build.bot_version}.exe")
-    _add("releases/windows/SlowBurnBot-latest.exe")
-    # Backward compatibility for buckets populated before versioned/latest naming.
-    _add("releases/windows/SlowBurnBot.exe")
-    _add("SlowBurnBot.exe")
+        _add(f"{prefix}SlowBurnBot-{build.bot_version}{ext}")
+    _add(f"{prefix}SlowBurnBot-latest{ext}")
+    if system_type != "macos":
+        # Backward compatibility for buckets populated before versioned/latest naming.
+        _add("releases/windows/SlowBurnBot.exe")
+        _add("SlowBurnBot.exe")
 
     selected_key = next((key for key in candidate_keys if object_exists(key)), None)
     if selected_key is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Windows release artifact is not available yet. Please try again in a few minutes.",
+            detail=f"{label} release artifact is not available yet. Please try again in a few minutes.",
         )
 
     signed_url = generate_signed_get_url(
         selected_key,
         expires_seconds=settings.desktop_signed_url_expires_seconds,
     )
-    return {"url": signed_url, "filename": f"SlowBurnBot-client{build.client_id}.exe"}
+    return {"url": signed_url, "filename": f"SlowBurnBot-client{build.client_id}{ext}"}
 
 
 @router.delete("/{build_id}", status_code=status.HTTP_204_NO_CONTENT)

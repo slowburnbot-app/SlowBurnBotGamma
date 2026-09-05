@@ -475,6 +475,9 @@ async def sync_bot_version(
 ):
     """Advance current_bot_version once both build artifacts (EXE + Docker image) exist.
 
+    The macOS binary is reported (macos_ready) but deliberately not part of the gate,
+    so a flaky Mac build can't hold up Windows and Linux releases.
+
     Returns 200 when the DB is updated, 202 while the build is still running.
     """
     try:
@@ -485,6 +488,7 @@ async def sync_bot_version(
         raise HTTPException(status_code=502, detail="Could not read BOT_VERSION from GitHub main branch.")
 
     exe_key = f"releases/windows/SlowBurnBot-{version}.exe"
+    macos_key = f"releases/macos/SlowBurnBot-{version}"
     # Transient failures while checking artifact readiness (S3 timeouts, GHCR
     # blips) mean "not ready yet", not a server error — return 202 so the
     # release script keeps polling instead of aborting on a 500.
@@ -496,6 +500,10 @@ async def sync_bot_version(
         image_ready = await github_actions.ghcr_image_has_tag(version)
     except Exception:
         image_ready = False
+    try:
+        macos_ready = object_storage.object_exists(macos_key)
+    except Exception:
+        macos_ready = False
 
     if not (exe_ready and image_ready):
         return JSONResponse(
@@ -505,6 +513,7 @@ async def sync_bot_version(
                 "target_version": version,
                 "exe_ready": exe_ready,
                 "image_ready": image_ready,
+                "macos_ready": macos_ready,
             },
         )
 
@@ -519,4 +528,5 @@ async def sync_bot_version(
         "release_date": config.current_bot_release_date,
         "exe_ready": True,
         "image_ready": True,
+        "macos_ready": macos_ready,
     }

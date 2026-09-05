@@ -552,7 +552,7 @@ export interface FollowTarget {
 // Desktop builds
 export interface DesktopBuildConfig {
   client_name: string;
-  system_type: "windows" | "linux";
+  system_type: "windows" | "linux" | "macos";
   novnc_url?: string;
 }
 
@@ -574,7 +574,7 @@ export interface DesktopBuildWithToken extends DesktopBuild {
 }
 
 export interface DownloadInfo {
-  // Windows
+  // Windows / macOS
   url?: string;
   filename?: string;
   // Linux

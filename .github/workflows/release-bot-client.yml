@@ -1,6 +1,11 @@
 # Release workflow — triggered by pushing a tag matching bot-client-v*.
-# Builds a generic Windows EXE (PyInstaller) and Linux Docker image (Nuitka),
-# uploads the EXE to Railway object storage, and pushes the Docker image to GHCR.
+# Builds a generic Windows EXE (PyInstaller), a macOS arm64 binary (PyInstaller,
+# unsigned beyond PyInstaller's ad-hoc signature) and a Linux Docker image,
+# uploads the EXE and macOS binary to Railway object storage, and pushes the
+# Docker image to GHCR.
+#
+# The server's release gate (POST /admin/sync-bot-version) waits for the EXE and
+# the Docker image only; the macOS binary is reported but never blocks a release.
 #
 # No customer-specific data is baked in. Activation happens at runtime via
 # the /bot/desktop/activate endpoint.
@@ -14,8 +19,8 @@
 #
 # GITHUB_TOKEN is used automatically for GHCR push (read/write packages permission required).
 #
-# Artifact retention: after each build, old versioned EXEs beyond the 5 most recent
-# are deleted from S3, and old GHCR package versions beyond 5 are pruned.
+# Artifact retention: after each build, old versioned EXEs / macOS binaries beyond
+# the 5 most recent are deleted from S3, and old GHCR package versions beyond 5 are pruned.
 
 name: release-bot-client
 
@@ -111,6 +116,102 @@ jobs:
           echo "$ALL" | head -n "$DELETE_COUNT" | while read -r KEY; do
             echo "Deleting s3://${BUCKET_NAME}/releases/windows/${KEY}"
             aws s3 rm "s3://${BUCKET_NAME}/releases/windows/${KEY}" \
+              --endpoint-url "${ENDPOINT_URL}" --region "${AWS_DEFAULT_REGION}"
+          done
+
+  # ──────────────────────────────────────────────────────────────
+  # macOS binary build (arm64 — Apple Silicon only for now)
+  # ──────────────────────────────────────────────────────────────
+  macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read BOT_VERSION
+        id: ver
+        run: |
+          BOT_VERSION=$(python -c "import re; m=re.search(r'BOT_VERSION\s*=\s*[\"\']([\d.]+)[\"\']', open('bot-client/burnBot_version.py').read()); print(m.group(1) if m else 'unknown')")
+          echo "bot_version=${BOT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "BOT_VERSION=${BOT_VERSION}"
+
+      - name: Install dependencies
+        # pyautogui / PyGetWindow are excluded by the spec; keep them out of the
+        # runner too so nothing pulls in their macOS Quartz bindings.
+        run: |
+          grep -viE '^(pyautogui|pygetwindow)' bot-client/requirements.txt > /tmp/requirements-macos.txt
+          pip install -r /tmp/requirements-macos.txt pyinstaller
+
+      - name: Build binary
+        working-directory: bot-client
+        run: pyinstaller SlowBurnBot.macos.spec --distpath ../dist --workpath ../build
+
+      - name: Verify ad-hoc signature
+        # Apple Silicon refuses to exec an arm64 binary with no signature at all.
+        # PyInstaller ad-hoc signs on macOS; confirm, and sign ourselves if it didn't.
+        run: |
+          file dist/SlowBurnBot
+          if ! codesign --verify --verbose=2 dist/SlowBurnBot; then
+            echo "No valid signature from PyInstaller — applying ad-hoc signature"
+            codesign --force -s - dist/SlowBurnBot
+            codesign --verify --verbose=2 dist/SlowBurnBot
+          fi
+          codesign -dv dist/SlowBurnBot 2>&1 | grep -E 'Identifier|Signature|TeamIdentifier' || true
+
+      - name: Upload binary to object storage
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUCKET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.BUCKET_REGION }}
+          ENDPOINT_URL: ${{ secrets.BUCKET_ENDPOINT_URL }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          BOT_VERSION: ${{ steps.ver.outputs.bot_version }}
+        run: |
+          pip install awscli
+          # Same single-part PUT workaround as the Windows job (see above).
+          aws configure set default.s3.multipart_threshold 256MB
+          upload() {
+            for attempt in 1 2 3; do
+              aws s3 cp dist/SlowBurnBot "$1" --endpoint-url "${ENDPOINT_URL}" --region "${AWS_DEFAULT_REGION}" && return 0
+              echo "upload attempt ${attempt} failed for $1 — retrying in $((attempt * 10))s"
+              sleep $((attempt * 10))
+            done
+            return 1
+          }
+          upload "s3://${BUCKET_NAME}/releases/macos/SlowBurnBot-${BOT_VERSION}"
+          upload "s3://${BUCKET_NAME}/releases/macos/SlowBurnBot-latest"
+          echo "Uploaded macos/SlowBurnBot-${BOT_VERSION}"
+
+      - name: Prune old macOS binaries from object storage (keep 5)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUCKET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.BUCKET_REGION }}
+          ENDPOINT_URL: ${{ secrets.BUCKET_ENDPOINT_URL }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+        run: |
+          KEEP=5
+          # Versioned binaries only (no extension); SlowBurnBot-latest never matches.
+          ALL=$(aws s3 ls "s3://${BUCKET_NAME}/releases/macos/" \
+            --endpoint-url "${ENDPOINT_URL}" --region "${AWS_DEFAULT_REGION}" \
+            | awk '{print $4}' \
+            | grep -E '^SlowBurnBot-[0-9]+\.[0-9]+$' \
+            | sort)
+          TOTAL=$(echo "$ALL" | grep -c .)
+          DELETE_COUNT=$(( TOTAL - KEEP ))
+          if [ "$DELETE_COUNT" -le 0 ]; then
+            echo "Only ${TOTAL} versioned macOS binar(y/ies) present — nothing to prune."
+            exit 0
+          fi
+          echo "$ALL" | head -n "$DELETE_COUNT" | while read -r KEY; do
+            echo "Deleting s3://${BUCKET_NAME}/releases/macos/${KEY}"
+            aws s3 rm "s3://${BUCKET_NAME}/releases/macos/${KEY}" \
               --endpoint-url "${ENDPOINT_URL}" --region "${AWS_DEFAULT_REGION}"
           done
 

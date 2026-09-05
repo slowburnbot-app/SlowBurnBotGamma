@@ -13,8 +13,8 @@ def _inject_missing_sections() -> None:
 
     Old config files pre-date these sections. Rather than crashing with a
     KeyError, inject sensible defaults so the bot can still start.
-    The defaults match what _write_ini_from_activation() writes for windows
-    (the only platform that ever runs pre-existing user configs).
+    The defaults match what _write_ini_from_activation() writes for each platform
+    (windows is the only one that ever runs pre-existing user configs).
     """
     system_type = CONFIG.get("bot_settings", "system_type", fallback="windows")
     if not CONFIG.has_section("browser-config"):
@@ -22,6 +22,10 @@ def _inject_missing_sections() -> None:
         if system_type == "linux":
             CONFIG.set("browser-config", "chrome_version", "")
             CONFIG.set("browser-config", "chrome_path", "/usr/bin/google-chrome")
+            CONFIG.set("browser-config", "chrome_user_data_dir_base", "ChromeUserData")
+        elif system_type == "macos":
+            CONFIG.set("browser-config", "chrome_version", "143")
+            CONFIG.set("browser-config", "chrome_path", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
             CONFIG.set("browser-config", "chrome_user_data_dir_base", "ChromeUserData")
         else:
             CONFIG.set("browser-config", "chrome_version", "143")

@@ -91,6 +91,22 @@ def _write_ini_from_activation(response: dict, config_path: str) -> None:
             "bot_idle_delay": "0.25",
             "novnc_url": opts.get("novnc_url", "http://localhost:6080/vnc.html"),
         }
+    elif system_type == "macos":
+        cp["browser-config"] = {
+            "chrome_version": "143",
+            # The user's own Google Chrome. Clear it to let Selenium Manager locate
+            # Chrome itself (e.g. an install under ~/Applications).
+            "chrome_path": MACOS_CHROME_PATH,
+            "chrome_user_data_dir_base": "ChromeUserData",
+            "debug_base_port": "9222",
+            "add_argument": "",
+        }
+        cp["browser-session"] = {
+            "headless": "False",
+            "close_browser_after_session": "False",
+            "close_browser_after_exit": "False",
+            "bot_idle_delay": "0.25",
+        }
     else:
         cp["browser-config"] = {
             "chrome_version": "143",
@@ -115,6 +131,7 @@ def _write_ini_from_activation(response: dict, config_path: str) -> None:
 
 
 _HARDCODED_API_URL = "https://slowburnbotgamma-production.up.railway.app"
+MACOS_CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
 def _parse_activation_token(token: str) -> tuple[str, int]:

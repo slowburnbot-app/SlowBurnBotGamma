@@ -983,6 +983,13 @@ class BurnBotApp(App):
     def _open_manual_browser(self, account: str | None) -> None:
         """Handle /browser [account]: launch a Chrome window into the VNC display
         on the given account's profile, so an operator can manually check login state."""
+        from burnBot_config import CONFIG
+        if CONFIG.get('bot_settings', 'system_type', fallback='windows') != 'linux':
+            self._write_log(_escape(client_log_line(
+                None, "terminal-command",
+                "/browser is only for linux/docker clients — on this platform the bot's Chrome window is already on your desktop"
+            )))
+            return
         if account is None:
             tracked = status_store.get_tracked_accounts()
             if not tracked:

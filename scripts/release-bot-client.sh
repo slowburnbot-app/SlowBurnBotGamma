@@ -5,8 +5,9 @@
 #   bash scripts/release-bot-client.sh
 #
 # Steps:
-#   1. Push bot-client-vX.XXX tag → triggers GitHub Actions (EXE + Docker build, ~3-4 min)
-#   2. Polls /admin/sync-bot-version every 20s until both artifacts exist (max 10 min)
+#   1. Push bot-client-vX.XXX tag → triggers GitHub Actions (EXE + macOS + Docker build, ~3-4 min)
+#   2. Polls /admin/sync-bot-version every 20s until the EXE and Docker image exist
+#      (max 20 min). The macOS binary is reported but does not gate the release.
 #   3. Once artifacts are live, the server advances current_bot_version and the
 #      dashboard banner updates.
 #
@@ -110,7 +111,7 @@ while :; do
     STATE=$(python3 -c "
 import json
 d = json.load(open('/tmp/_sync_resp.json'))
-print(f'exe={d.get(\"exe_ready\")} image={d.get(\"image_ready\")}')" 2>/dev/null)
+print(f'exe={d.get(\"exe_ready\")} image={d.get(\"image_ready\")} macos={d.get(\"macos_ready\")}')" 2>/dev/null)
     NOW=$(date +%s)
     if [ "$NOW" -ge "$DEADLINE" ]; then
       echo "error: build did not complete within 20 min (${STATE})" >&2

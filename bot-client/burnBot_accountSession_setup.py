@@ -98,8 +98,14 @@ def launch_manual_browser(account):
     Returns:
         bool: True if the process was launched (or handed off to Chrome's existing
               instance for that profile), False if the Chrome binary could not be started.
+
+    Linux/noVNC only: the hardcoded binary and container flags below are wrong for
+    Windows and macOS, where the automation browser is already on the user's desktop.
     """
     import subprocess
+
+    if CONFIG.get('bot_settings', 'system_type', fallback='windows') != 'linux':
+        return False
 
     chrome_user_data_dir = build_user_data_dir(account)
     chrome_path = CONFIG.get('browser-config', 'chrome_path', fallback='/usr/bin/google-chrome')
@@ -1162,7 +1168,8 @@ def setup_chrome_options(account, chrome_user_data_dir, debugging_port, chrome_b
     if chrome_binary:
         options.binary_location = chrome_binary
 
-    # Headless + Linux/Docker flags
+    # Headless + Linux/Docker flags. Windows and macOS take no extra flags: both run
+    # the user's own Chrome on a real desktop with a GPU and a window manager.
     system_type = CONFIG.get('bot_settings', 'system_type', fallback='windows')
     # Linux always runs headed into Xvfb via noVNC — headless config is ignored
     headless = False if system_type == 'linux' else CONFIG.getboolean('browser-session', 'headless', fallback=False)

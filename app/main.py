@@ -33,7 +33,11 @@ async def _prune_expired_access_tokens() -> None:
 
 
 async def _sync_bot_version() -> None:
-    """On startup, advance current_bot_version only if both build artifacts exist."""
+    """On startup, advance current_bot_version only if both build artifacts exist.
+
+    Mirrors POST /admin/sync-bot-version: the gate is the Windows EXE plus the
+    Docker image; the macOS binary is not required (see that endpoint).
+    """
     if not settings.github_token or not settings.github_repo:
         return
     try:

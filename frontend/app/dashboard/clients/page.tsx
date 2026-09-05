@@ -27,6 +27,29 @@ const DEFAULT_LINUX_CONFIG: DesktopBuildConfig = {
   novnc_url: "http://localhost:6080/vnc.html",
 };
 
+const DEFAULT_MACOS_CONFIG: DesktopBuildConfig = {
+  client_name: "",
+  system_type: "macos",
+};
+
+type Platform = DesktopBuildConfig["system_type"];
+
+const PLATFORM_DEFAULTS: Record<Platform, DesktopBuildConfig> = {
+  windows: DEFAULT_CONFIG,
+  linux: DEFAULT_LINUX_CONFIG,
+  macos: DEFAULT_MACOS_CONFIG,
+};
+
+const PLATFORM_LABELS: Record<Platform, string> = {
+  windows: "windows",
+  linux: "linux/docker",
+  macos: "macos",
+};
+
+function platformLabel(system_type: string): string {
+  return system_type === "linux" ? "linux" : system_type === "macos" ? "macos" : "windows";
+}
+
 const sectionCls = "border border-base03";
 
 function statusColor(status: string): string {
@@ -59,12 +82,8 @@ function BuildForm({
     setCfg((p) => ({ ...p, [k]: v }));
   }
 
-  function switchPlatform(platform: "windows" | "linux") {
-    if (platform === "linux") {
-      setCfg((p) => ({ ...DEFAULT_LINUX_CONFIG, client_name: p.client_name }));
-    } else {
-      setCfg((p) => ({ ...DEFAULT_CONFIG, client_name: p.client_name }));
-    }
+  function switchPlatform(platform: Platform) {
+    setCfg((p) => ({ ...PLATFORM_DEFAULTS[platform], client_name: p.client_name }));
   }
 
   const canSubmit = !submitting;
@@ -73,18 +92,15 @@ function BuildForm({
     <div className="px-4 py-3 bg-base01 border-t border-base03">
       <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
         <BracketInput label="client name" value={cfg.client_name} onChange={(v) => set("client_name", v.slice(0, 15))} width="15ch" placeholder="my laptop" />
-        <button
-          onClick={() => switchPlatform("windows")}
-          className={`cursor-pointer transition-colors ${cfg.system_type === "windows" ? "text-base0e" : "text-base04 hover:text-white"}`}
-        >
-          <span className="text-base05">[</span>windows<span className="text-base05">]</span>
-        </button>
-        <button
-          onClick={() => switchPlatform("linux")}
-          className={`cursor-pointer transition-colors ${cfg.system_type === "linux" ? "text-base0e" : "text-base04 hover:text-white"}`}
-        >
-          <span className="text-base05">[</span>linux/docker<span className="text-base05">]</span>
-        </button>
+        {(Object.keys(PLATFORM_LABELS) as Platform[]).map((platform) => (
+          <button
+            key={platform}
+            onClick={() => switchPlatform(platform)}
+            className={`cursor-pointer transition-colors ${cfg.system_type === platform ? "text-base0e" : "text-base04 hover:text-white"}`}
+          >
+            <span className="text-base05">[</span>{PLATFORM_LABELS[platform]}<span className="text-base05">]</span>
+          </button>
+        ))}
         {cfg.system_type === "linux" && (
           <BracketInput
             label="vnc url"
@@ -320,7 +336,9 @@ export default function ClientPage() {
           <p className="text-base04">
             {(justCreated.build_options as DesktopBuildConfig).system_type === "linux"
               ? "Copy this token, then click commands on your slot to get the docker commands."
-              : "Download the generic binary and paste this token on first run."}
+              : (justCreated.build_options as DesktopBuildConfig).system_type === "macos"
+                ? "Download the generic binary, follow the macOS steps under getting started, and paste this token on first run."
+                : "Download the generic binary and paste this token on first run."}
           </p>
           <p className="text-base04">This token is shown once — it expires in 24 hours and can only be used once.</p>
         </div>
@@ -356,7 +374,7 @@ export default function ClientPage() {
                       <tr key={build.id} className="border-t border-base03 hover:bg-base02 transition-colors">
                         <td className="px-3 py-3 text-base05 whitespace-nowrap">#{String(build.client_id).padStart(2, "0")}</td>
                         <td className="px-3 py-3 text-base04 whitespace-nowrap">{cfg.client_name || "—"}</td>
-                        <td className="px-3 py-3 text-base04 whitespace-nowrap">{cfg.system_type === "linux" ? "linux" : "windows"}</td>
+                        <td className="px-3 py-3 text-base04 whitespace-nowrap">{platformLabel(cfg.system_type)}</td>
                         <td className="px-3 py-3 text-base04 whitespace-nowrap">{fmtDate(build.created_at)}</td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           {buildIsOutdated
@@ -490,6 +508,15 @@ export default function ClientPage() {
             <p><span className="text-base05">1.</span> Click <span className="text-base05">token</span> on an empty slot, enter a name, and copy the activation token shown after saving.</p>
             <p><span className="text-base05">2.</span> Click <span className="text-base05">download</span> on your slot to get <code className="text-base0a">SlowBurnBot.exe</code>. Put it in a folder on your machine.</p>
             <p><span className="text-base05">3.</span> Run the EXE. On first launch it will prompt for your Activation Token. Paste it in — the config is written locally and you won't be asked again.</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-base05">macos</p>
+            <p><span className="text-base05">1.</span> Click <span className="text-base05">token</span> on an empty slot, select <span className="text-base05">macos</span>, enter a name, and copy the activation token shown after saving.</p>
+            <p><span className="text-base05">2.</span> Click <span className="text-base05">download</span> on your slot to get <code className="text-base0a">SlowBurnBot-clientN</code> (no extension). Move it into its own folder — the config and browser profiles are written next to it. Google Chrome must be installed in <code className="text-base0a">/Applications</code>.</p>
+            <p><span className="text-base05">3.</span> The client is not signed with Apple, so macOS quarantines the download. In Terminal, <code className="text-base0a">cd</code> into that folder and run:</p>
+            <pre className="text-base0a whitespace-pre-wrap break-all pl-6">chmod +x SlowBurnBot-clientN && xattr -d com.apple.quarantine SlowBurnBot-clientN</pre>
+            <p><span className="text-base05">4.</span> Start it with <code className="text-base0a">./SlowBurnBot-clientN</code>. On first launch it will prompt for your Activation Token. Paste it in — the config is written locally and you won&apos;t be asked again.</p>
+            <p><span className="text-base05">5.</span> Repeat step 3 after every re-download — each new version is quarantined again.</p>
           </div>
           <div className="space-y-1">
             <p className="text-base05">linux/docker</p>
