@@ -28,6 +28,12 @@ if [ -f .env ]; then
   set +o allexport
 fi
 
+# Git pushes below authenticate through the gh credential helper. gh prefers an
+# exported GITHUB_TOKEN over its stored login, so a GITHUB_TOKEN sourced from .env
+# (the backend's own setting, not a git credential) hijacks every push — the
+# 2026-09-05 release failed on exactly this with "Invalid username or token".
+unset GITHUB_TOKEN GH_TOKEN
+
 PUBLIC_API_URL="${PUBLIC_API_URL:-https://slowburnbotgamma-production.up.railway.app}"
 
 if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
@@ -35,12 +41,9 @@ if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
   exit 1
 fi
 
-# git push retry — 2026-09-04: a release backgrounded via the Claude Code
-# Bash tool hit "Invalid username or token" from GitHub on both pushes back
-# to back, then succeeded immediately on retry with an identical
-# environment (same HOME, same gh credential-helper resolution) — a
-# transient auth/network blip, not anything foreground/background-specific.
-# A short retry absorbs that instead of aborting the whole release on it.
+# git push retry — kept for genuine transient network blips. (The 2026-09-04
+# "Invalid username or token" failures this was added for were most likely the
+# sourced GITHUB_TOKEN above, not a blip — that is now unset before pushing.)
 _push_with_retry() {
   local max_attempts=3 delay=5 attempt=1
   while true; do
