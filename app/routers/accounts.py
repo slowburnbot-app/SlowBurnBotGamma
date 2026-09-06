@@ -16,6 +16,7 @@ from app.deps import require_active_subscription
 from app.plan_tiers import get_max_accounts
 from app.models.account import Account
 from app.models.account_settings import AccountSettings
+from app.models.action_limit import ActionLimit
 from app.models.activity_log import ActivityLog
 from app.models.client_heartbeat import ClientHeartbeat
 from app.models.desktop_build import DesktopBuild
@@ -26,7 +27,9 @@ from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.account import AccountCreate, AccountRead, AccountUpdate
 from app.schemas.account_settings import AccountSettingsRead, AccountSettingsUpdate
+from app.schemas.action_limit import ActionLimitRead, ActiveActionLimit
 from app.schemas.follow_seed import FollowSeedCreate, FollowSeedListRead, FollowSeedRead, FollowSeedUpdate
+from app.services.action_limits import active_limits
 from app.services.follow_seeds import list_seeds, normalize_handle, seed_stats_by_handle, seed_to_dict
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -46,10 +49,19 @@ async def _get_owned_account(
     return account
 
 
-def _account_read(account: Account) -> AccountRead:
+def _account_read(account: Account, limits: list[ActiveActionLimit] | None = None) -> AccountRead:
     return AccountRead.model_validate(account, from_attributes=True).model_copy(
-        update={"has_password": account.ig_password_enc is not None}
+        update={
+            "has_password": account.ig_password_enc is not None,
+            "action_limits": limits or [],
+        }
     )
+
+
+async def _account_reads(session: AsyncSession, accounts: list[Account]) -> list[AccountRead]:
+    """AccountRead list with each account's active action-limit cooldowns attached (one query)."""
+    limits = await active_limits(session, [a.id for a in accounts])
+    return [_account_read(a, limits.get(a.id)) for a in accounts]
 
 
 def _clean_session_action_type(raw: str | None) -> str | None:
@@ -76,7 +88,7 @@ async def list_accounts(
     if group_number is not None:
         query = query.where(Account.group_number == group_number)
     result = await session.execute(query)
-    return [_account_read(a) for a in result.scalars().all()]
+    return await _account_reads(session, list(result.scalars().all()))
 
 
 @router.get("/client-status", response_model=list)
@@ -324,7 +336,26 @@ async def get_account(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ):
-    return _account_read(await _get_owned_account(account_id, user, session))
+    account = await _get_owned_account(account_id, user, session)
+    return (await _account_reads(session, [account]))[0]
+
+
+@router.get("/{account_id}/action-limits", response_model=list[ActionLimitRead])
+async def get_account_action_limits(
+    account_id: uuid.UUID,
+    limit: int = Query(20, ge=1, le=100),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Recent Instagram action-limit events for the account detail page (newest first)."""
+    await _get_owned_account(account_id, user, session)
+    result = await session.execute(
+        select(ActionLimit)
+        .where(ActionLimit.account_id == account_id)
+        .order_by(ActionLimit.created_at.desc())
+        .limit(limit)
+    )
+    return [ActionLimitRead.model_validate(r) for r in result.scalars().all()]
 
 
 @router.patch("/{account_id}", response_model=AccountRead)
@@ -347,7 +378,7 @@ async def update_account(
         setattr(account, field, value)
     await session.commit()
     await session.refresh(account)
-    return _account_read(account)
+    return (await _account_reads(session, [account]))[0]
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)

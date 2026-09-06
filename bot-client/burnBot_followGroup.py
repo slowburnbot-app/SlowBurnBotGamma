@@ -16,6 +16,7 @@ from burnBot_followSuggested import _find_home_follow_candidates
 from burnBot_followFilter import load_known_handles, screen_candidate
 from burnBot_seeds import load_seed_pool, order_seeds, finish_seed_use, maybe_discover_seeds
 import burnBot_status as status_store
+import burnBot_actionLimit as limit
 
 _p = _builtins.print  # set per-call by do_follow_group; safe because sessions run sequentially
 
@@ -171,10 +172,19 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
                     skip_private += 1
                     continue
 
-                try:
-                    hclick(driver, follow_button)
-                except Exception:
-                    driver.execute_script("arguments[0].click();", follow_button)
+                _outcome = limit.follow_and_verify(driver, follow_button, context=f"{target_account}[{action_type}] {user_name}")
+                if _outcome == "blocked":
+                    return followed_count, skip_already, skip_private, module_errors_log
+                if _outcome == "reverted":
+                    _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [follow reverted]"))
+                    limit.record_revert("follow", context=f"{target_account}[{action_type}] {user_name}")
+                    if limit.is_action_blocked("follow")[0]:
+                        return followed_count, skip_already, skip_private, module_errors_log
+                    hsleep(10, 20)
+                    continue
+                if _outcome != "following":
+                    debug_line(client_log_line(account, scope, f"skip @{user_name} reason=follow_{_outcome}"))
+                    continue
 
                 followed_count += 1
                 database_names.add(user_name)
@@ -237,6 +247,11 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
     module_errors_log = ""
     module_warnings_log = ""
     followed_count = 0
+
+    _blocked, _why = limit.is_action_blocked("follow")
+    if _blocked:
+        _p(client_log_line(account, _scope, f"{_lbl}skipped - action limit ({_why})"))
+        return 0, module_errors_log, module_warnings_log
 
     try:
         follow_date = date.today()
@@ -447,10 +462,24 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                         if not user_name_element.text:
                             continue
 
-                        # Follow the account
+                        # Follow the account — counted only once the button
+                        # flips to Following/Requested and stays there.
+                        _outcome = limit.follow_and_verify(driver, user_status_element, context=f"{target_source} {user_name}")
+                        if _outcome == "blocked":
+                            r["followed"] = followed   # normally copied in at the end (below)
+                            return r
+                        if _outcome == "reverted":
+                            _p(client_log_line(account, _scope, f"{target_source}-[-skip] - [{user_name}] - [follow reverted]"))
+                            limit.record_revert("follow", context=f"{target_source} {user_name}")
+                            if limit.is_action_blocked("follow")[0]:
+                                r["followed"] = followed
+                                return r
+                            hsleep(10, 20)
+                            continue
+                        if _outcome != "following":
+                            debug_line(client_log_line(account, _scope, f"skip @{user_name} reason=follow_{_outcome}"))
+                            continue
                         followed += 1
-
-                        hclick(driver, user_status_element)
 
                         # Log followed account via API
                         try:
@@ -518,6 +547,11 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
             followed_count += r["followed"]
             module_errors_log += r["errors"]
             module_warnings_log += r["warnings"]
+
+            if limit.is_action_blocked("follow")[0]:
+                # Action limit tripped mid-target: not a seed-quality signal,
+                # so no saturation bookkeeping — just stop following.
+                break
 
             if r["not_found"]:
                 finish_seed_use(apiClient, seed, None, account_rate, account, _scope, _lbl, _p, retire_reason="not found")

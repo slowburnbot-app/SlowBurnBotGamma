@@ -14,6 +14,7 @@ caller's tuned range/target and keeps existing fallbacks working:
 No burnBot_* imports here on purpose (avoid import cycles).
 """
 import random
+import threading
 import time
 
 from selenium.webdriver.common.action_chains import ActionChains
@@ -25,12 +26,33 @@ from selenium.webdriver.common.action_chains import ActionChains
 # bursty (human) rather than a tight band around one value (uniform).
 _LONG_PAUSE_CHANCE = 0.07
 
+# Per-thread cadence multiplier applied to every hsleep/hdelay range. Account
+# sessions run as concurrent threads, so a module-level float would leak one
+# account's backoff into the others; thread-local keeps the scale per session
+# (same pattern as burnBot_run_log._context). burnBot_actionLimit raises it to
+# 2.0 when Instagram starts silently dropping an account's actions. Motor
+# timing (htype/hclick/hscroll micro-pauses) is deliberately not scaled.
+_scale = threading.local()
+
+
+def set_delay_scale(factor) -> None:
+    """Set this thread's cadence multiplier (1.0 = normal). Values < 1 are clamped."""
+    try:
+        _scale.value = max(1.0, float(factor))
+    except Exception:
+        _scale.value = 1.0
+
+
+def get_delay_scale() -> float:
+    return getattr(_scale, "value", 1.0)
+
 
 def hdelay(lo, hi):
     """Return a human-shaped duration in seconds for the range [lo, hi].
 
     Body is triangular (peaked at the midpoint -> same mean as the old
     random.uniform, but not flat); occasionally a longer tail is added.
+    The result is multiplied by this thread's delay scale (see set_delay_scale).
     """
     if hi < lo:
         lo, hi = hi, lo
@@ -41,7 +63,7 @@ def hdelay(lo, hi):
     if random.random() < _LONG_PAUSE_CHANCE:
         span = (hi - lo) or max(float(lo), 1.0)
         base += random.uniform(0.8, 1.8) * span + random.uniform(0.4, 1.5)
-    return base
+    return base * get_delay_scale()
 
 
 def hsleep(lo, hi):

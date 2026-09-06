@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.schemas.action_limit import ActiveActionLimit
+
 
 class AccountCreate(BaseModel):
     name: str
@@ -34,5 +36,10 @@ class AccountRead(BaseModel):
     has_password: bool = False
     proxy_enabled: bool
     proxy_type: str | None
+    # Active Instagram action-limit cooldowns (attached by the routers from
+    # app.services.action_limits.active_limits — not a column).
+    action_limits: list[ActiveActionLimit] = []
+    status_page_checked_at: datetime | None = None
+    status_page_result: str | None = None
     created_at: datetime
     updated_at: datetime

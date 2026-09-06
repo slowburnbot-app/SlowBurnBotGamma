@@ -1,6 +1,7 @@
 # burnBot_apiClient.py
 # Replaces burnBot_driveManager.py — all data access goes through the FastAPI backend
 
+import json
 import threading
 import time
 from datetime import datetime, date
@@ -338,7 +339,15 @@ class ApiClient:
                 acct_id = acct.get("id")
                 s = acct.get("settings")
                 if acct_id and s is not None:
-                    self._settings_cache[acct_id] = (s, now)
+                    # Match the shape of GET /bot/settings/{id}: the account-level
+                    # action-limit fields ride along with the settings row so a
+                    # cache primed here honours cooldowns exactly like a direct fetch.
+                    merged = {
+                        **s,
+                        "action_limits": acct.get("action_limits") or [],
+                        "status_page_checked_at": acct.get("status_page_checked_at"),
+                    }
+                    self._settings_cache[acct_id] = (merged, now)
             user_config = data.get("user_config")
             if user_config is not None:
                 self._config_cache = user_config
@@ -463,6 +472,45 @@ class ApiClient:
             self._request("POST", "/bot/activity-log", json=payload)
         except Exception as e:
             _log_api_err(e, "Failed to log error")
+
+    # ------------------------------------------------------------------
+    # Action limits (Instagram throttling detected by burnBot_actionLimit)
+    # ------------------------------------------------------------------
+
+    def report_action_limit(self, account_id, action, tier, reason, details=None):
+        """Record a detected action limit. For tier="hard" the backend starts an
+        escalating cooldown and replies {action, tier, reason, strike, until}.
+        Returns that dict, or None on failure (never raises)."""
+        payload = {
+            "account_id": str(account_id),
+            "action": action,
+            "tier": tier,
+            "reason": (reason or "")[:200],
+            "details": json.dumps(details, default=str)[:8000] if details else None,
+        }
+        try:
+            resp = self._request("POST", "/bot/action-limit", json=payload)
+            return resp.json()
+        except Exception as e:
+            _log_api_err(e, "Failed to report action limit")
+            return None
+
+    def report_status_page_check(self, account_id, clean, text=""):
+        """Record a read of Instagram's Account Status pages. `clean` is True,
+        False or None (unreadable). A clean read lets the backend shorten a
+        48h/72h cooldown back to 24h; it replies {ok, released: [{action,
+        until}]}. Returns that dict, or None."""
+        payload = {
+            "account_id": str(account_id),
+            "clean": None if clean is None else bool(clean),
+            "text": (text or "")[:8000] or None,
+        }
+        try:
+            resp = self._request("POST", "/bot/status-page-check", json=payload)
+            return resp.json()
+        except Exception as e:
+            _log_api_err(e, "Failed to report status page check")
+            return None
 
     # ------------------------------------------------------------------
     # Follow targets

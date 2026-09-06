@@ -133,6 +133,48 @@ def send_login_failure_alert(account, error_message, run_count=0, max_runs=0, ap
         _print(client_log_line(account, "notify", f"Failed to send login failure alert: {e}"))
 
 
+def send_action_limit_alert(account, action, tier, reason, until=None, strike=None, apiClient=None, account_id=None, _print=None):
+    """Alert that Instagram limited an action (like/follow/unfollow) on this
+    account. Uses the Login/Error notification channel — a limit is an
+    error-class event, and this keeps the customer's prefs to one switch."""
+    if _print is None:
+        _print = builtins.print
+    try:
+        user_config = apiClient.get_user_config() if apiClient else None
+        if not user_config or not user_config.get('notices_login', True):
+            return
+
+        notice_type = (user_config.get('login_notices_type') or user_config.get('notices_type') or 'none').strip().lower()
+        notice_email = user_config.get('login_notify_email') or user_config.get('notify_email') or ''
+        notice_phone = user_config.get('login_notify_phone') or user_config.get('notify_phone') or ''
+
+        if notice_type == 'none':
+            return
+
+        verb = (action or "action").upper()
+        if tier == "hard":
+            what = f"Instagram blocked {action}s on this account ({reason})."
+            when = f"The bot will skip {action}s until {until}." if until else f"The bot stopped {action}s for this run."
+        elif tier == "status_page":
+            what = f"Instagram's Account Status page reports a limit on this account ({reason})."
+            when = "Check Settings > Account Status in the Instagram app for details."
+        else:
+            what = f"Instagram is silently rejecting {action}s on this account ({reason})."
+            when = f"The bot stopped {action}s for this run and will retry next session."
+        strike_info = f"\nStrike: {strike} in the last 7 days" if strike else ""
+
+        formatted_message = (
+            f"Action Limit — {verb}\n\n"
+            f"Account: {account}\n{what}\n{when}{strike_info}\n\n"
+            f"Slowing down protects the account; no action is needed unless this repeats."
+        )
+        sms_summary = f"{account} - {verb} LIMITED\n{reason}\n" + (f"skipping until {until}" if until else "stopped this run")
+        subject = f"SlowBurnBot Action Limit - {account}"
+        _dispatch(account, notice_type, notice_email, notice_phone, subject, formatted_message, sms_summary, apiClient, account_id=account_id, _print=_print)
+    except Exception as e:
+        _print(client_log_line(account, "notify", f"Failed to send action limit alert: {e}"))
+
+
 def send_captcha_challenge_alert(account, novnc_url, run_count=0, max_runs=0, apiClient=None, account_id=None, _print=None):
     """Send an action-required alert when Instagram serves a CAPTCHA challenge during login."""
     if _print is None:

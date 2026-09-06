@@ -10,7 +10,9 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 import burnBot_status as status_store
 from burnBot_client_log import client_log_line
+from burnBot_run_log import debug_line
 from burnBot_followFilter import load_known_handles, screen_candidate
+import burnBot_actionLimit as limit
 
 _p = _builtins.print  # set per-call by do_follow_suggested; safe because sessions run sequentially
 
@@ -158,6 +160,11 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
     module_errors_log = ""
     module_warnings_log = ""
     followed_count = 0
+
+    _blocked, _why = limit.is_action_blocked("follow")
+    if _blocked:
+        _p(client_log_line(account, _scope, f"{_lbl}skipped - action limit ({_why})"))
+        return 0, module_errors_log, module_warnings_log
 
     try:
         today = date.today()
@@ -326,10 +333,22 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                         if not user_name_element.text:
                             continue
 
-                        # Follow the account
+                        # Follow the account — counted only once the button
+                        # flips to Following/Requested and stays there.
+                        _outcome = limit.follow_and_verify(driver, user_status_element, context=f"suggested {user_name}")
+                        if _outcome == "blocked":
+                            return followed_count, module_errors_log, module_warnings_log
+                        if _outcome == "reverted":
+                            _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [follow reverted]"))
+                            limit.record_revert("follow", context=f"suggested {user_name}")
+                            if limit.is_action_blocked("follow")[0]:
+                                return followed_count, module_errors_log, module_warnings_log
+                            hsleep(10, 20)
+                            continue
+                        if _outcome != "following":
+                            debug_line(client_log_line(account, _scope, f"skip @{user_name} reason=follow_{_outcome}"))
+                            continue
                         followed_count += 1
-
-                        hclick(driver, user_status_element)
 
                         # Log followed account via API
                         _create_follow_entry(
@@ -387,19 +406,20 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                         ):
                             continue
 
+                        _outcome = limit.follow_and_verify(driver, follow_button, context=f"suggested-fallback {user_name}")
+                        if _outcome == "blocked":
+                            return followed_count, module_errors_log, module_warnings_log
+                        if _outcome == "reverted":
+                            _p(client_log_line(account, _scope, f"{_lbl}[-skip] - [{user_name}] - [follow reverted]"))
+                            limit.record_revert("follow", context=f"suggested-fallback {user_name}")
+                            if limit.is_action_blocked("follow")[0]:
+                                return followed_count, module_errors_log, module_warnings_log
+                            hsleep(10, 20)
+                            continue
+                        if _outcome != "following":
+                            debug_line(client_log_line(account, _scope, f"skip @{user_name} reason=follow_{_outcome}"))
+                            continue
                         followed_count += 1
-
-                        try:
-                            hclick(driver, follow_button)
-                        except Exception:
-                            try:
-                                follow_button.click()
-                            except Exception:
-                                try:
-                                    driver.execute_script("arguments[0].click();", follow_button)
-                                except Exception:
-                                    followed_count -= 1
-                                    continue
 
                         _create_follow_entry(
                             apiClient, account_id,

@@ -27,6 +27,7 @@ import {
 } from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
 import { Dropdown } from "@/lib/dropdown";
+import { ActionLimitBadges } from "@/lib/action-limit-badge";
 import { scheduleLabel, formatSessionAction } from "@/lib/format";
 
 function fmtTime(iso: string | null): string {
@@ -451,7 +452,10 @@ export default function DashboardPage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-2 pr-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: "20ch" }}>{account.name}</td>
+                    <td className="px-2 pr-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: "20ch" }}>
+                      {account.name}
+                      {account.action_limits?.length > 0 && <> <ActionLimitBadges limits={account.action_limits} /></>}
+                    </td>
                     {tab === "settings" && (
                       <>
                         <td className="px-[6px] py-2 whitespace-nowrap">{fmtGroup(account.group_number)}</td>

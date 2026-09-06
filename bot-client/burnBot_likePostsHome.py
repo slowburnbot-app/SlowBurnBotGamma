@@ -7,8 +7,9 @@ from burnBot_utils import process_exception, get_post_author_username
 from burnBot_login import check_phone_verification, switch_login
 from burnBot_accountSession_setup import is_bot_debug_enabled
 from burnBot_client_log import client_log_line
-from burnBot_run_log import debug_line
-from burnBot_likePostsTopic import _normalize_post_path
+from burnBot_run_log import debug_line, report_failure, capture_failure_context
+from burnBot_likePostsTopic import _normalize_post_path, _MAX_LIKE_DIAG_REPORTS
+import burnBot_actionLimit as limit
 import random
 import time
 import burnBot_status as status_store
@@ -320,7 +321,13 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
     processed_urls = set()  # Track post permalinks (or author, as fallback) to avoid duplicates
     no_progress_passes = 0
     stall_handle = None
+    like_diag_reports = 0  # cap on full-page diagnostics uploaded per action
     t0 = time.monotonic()
+
+    _blocked, _why = limit.is_action_blocked("like")
+    if _blocked:
+        _p(client_log_line(account, _scope, f"{_lbl}skipped - action limit ({_why})"))
+        return likes_performed, moduleErrorsLog, moduleWarningsLog
 
     # Load like_suggested and like_sponsored settings from API
     _user_cfg = apiClient.get_user_config() if apiClient else {}
@@ -496,6 +503,7 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
 
                     hhover(driver, article)
                     clicked = False
+                    _marker = limit.mark(driver)
                     try:
                         hclick(driver, like_button)
                         clicked = True
@@ -519,20 +527,51 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
                     # would have reported 6/6 while liking nothing).
                     # Scoped to the action-bar <section> so a comment
                     # heart can't satisfy the check.
+                    _unlike_xpath = ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Unlike']]"
                     try:
                         WebDriverWait(article, 6).until(
-                            lambda a: len(a.find_elements(
-                                By.XPATH,
-                                ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Unlike']]"
-                            )) > 0
+                            lambda a: len(a.find_elements(By.XPATH, _unlike_xpath)) > 0
                         )
+                        flipped = True
+                    except TimeoutException:
+                        flipped = False
+
+                    # Block dialog / rejected request (checked after the flip
+                    # wait — the dialog lands with the API response, a beat
+                    # after the click). A hard action limit stops likes for
+                    # the run.
+                    if limit.after_click(driver, "like", _marker, context=f"home @{display_name}"):
+                        return likes_performed, moduleErrorsLog, moduleWarningsLog
+
+                    if flipped and limit.like_reverted(article, _unlike_xpath):
+                        # Flipped then snapped back: Instagram rejected the like
+                        # (soft action-limit signal). A never-flipped heart is a
+                        # selector problem, not a limit, and is handled below.
+                        debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_reverted"))
+                        limit.record_revert("like", context=f"home @{display_name}")
+                        _blocked, _why = limit.is_action_blocked("like")
+                        if _blocked:
+                            return likes_performed, moduleErrorsLog, moduleWarningsLog
+                        hsleep(3, 4)
+                    elif flipped:
                         likes_performed += 1
                         count_formatted = f"{likes_performed:02d}"
                         _p(client_log_line(account, _scope, f"{_lbl}[{count_formatted}/{target_formatted}] - [{display_name}]"))
-                    except TimeoutException:
+                        hsleep(3, 4)   # remainder of the old 6-8s pause (re-check took the rest)
+                    else:
                         debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_state_unchanged"))
-
-                    hsleep(6, 8)
+                        if like_diag_reports < _MAX_LIKE_DIAG_REPORTS:
+                            like_diag_reports += 1
+                            try:
+                                report_failure(
+                                    account_id, "home-feed/like-verify", "unchanged",
+                                    {"post": display_name,
+                                     "article_html": (article.get_attribute("outerHTML") or "")[:2000],
+                                     "diag": capture_failure_context(driver)},
+                                )
+                            except Exception:
+                                pass
+                        hsleep(6, 8)
 
                     if likes_performed >= target_count:
                         break

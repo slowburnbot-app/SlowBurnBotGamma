@@ -26,6 +26,12 @@ class Account(Base):
     ig_password_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     proxy_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     proxy_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Last read of Instagram's Account Status pages by the bot (see
+    # app/services/action_limits.py); result is "clean" | "flagged".
+    status_page_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status_page_result: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -44,5 +50,11 @@ class Account(Base):
         back_populates="account", cascade="all, delete-orphan", passive_deletes=True
     )
     follow_targets: Mapped[list["FollowTarget"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan", passive_deletes=True
+    )
+    # Named to avoid AccountRead.action_limits (a derived, non-column field):
+    # pydantic's from_attributes would otherwise try to lazy-load this
+    # relationship on an async session.
+    action_limit_events: Mapped[list["ActionLimit"]] = relationship(
         back_populates="account", cascade="all, delete-orphan", passive_deletes=True
     )

@@ -17,6 +17,7 @@ from burnBot_randomActions import do_random_action
 from burnBot_client_log import client_log_line, action_target_label, summarize_issue_log
 from burnBot_run_log import set_session_context, clear_session_context, capture_failure_context, report_failure, flush_session_log, debug_line
 import burnBot_status as status_store
+import burnBot_actionLimit as limit
 
 # Global dictionary to store driver instances
 drivers = {}
@@ -301,6 +302,17 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                     except Exception:
                         main_window = None
 
+                    # Action-limit tracking for this session: server-side
+                    # cooldowns (from the settings payload) make the matching
+                    # action slots skip; the once-a-day Account Status read
+                    # lets the server shorten a repeat cooldown.
+                    limit.begin_session(account, account_id, apiClient, settings.get("action_limits"), _print=_print)
+                    if limit.status_check_due(settings.get("status_page_checked_at")):
+                        try:
+                            limit.check_status_page(driver, account, account_id, apiClient, _print=_print)
+                        except Exception as _status_err:
+                            debug_line(client_log_line(account, "limit", f"account status check failed: {_status_err}"))
+
                     try:
                         _next_run = apiClient.get_run_count(account_id) + 1
                         if scheduleMax > 0:
@@ -325,7 +337,13 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                         _count = 0
                         _ran = False  # set True only once an action module actually ran to completion
 
-                        if _enabled and _act_type:
+                        _limited, _limit_why = limit.is_action_blocked(_act_type) if (_enabled and _act_type) else (False, "")
+                        if _limited:
+                            _act_label = action_target_label(_act_type, _act_target)
+                            _print(client_log_line(account, f"action[{_slot_num}]", f"{_act_label}-skipped[action limit: {_limit_why}]"))
+                            moduleWarningsLog += f"{_act_label}: [warning] skipped - action limit ({_limit_why})\n"
+
+                        elif _enabled and _act_type:
                             _total = _fixed + (random.randint(1, _variable) if _variable > 0 else 0)
                             _act_label = action_target_label(_act_type, _act_target)
                             _act_scope = f"action[{_slot_num}]"
@@ -439,6 +457,10 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                                     pass
                                 _count = 0
 
+                            # Action-limit events raised inside the module land in
+                            # the session warning log (run summary + dashboard).
+                            moduleWarningsLog += limit.drain_warnings()
+
                         elif _enabled:
                             _print(client_log_line(account, f"action[{_slot_num}]", "enabled but no type"))
                         else:
@@ -476,6 +498,8 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                     session_end_time = datetime.now().astimezone()
                     run_count = 1
                     max_runs = scheduleMax
+                    moduleWarningsLog += limit.drain_warnings()
+                    limit.end_session()
                     try:
                         run_seq = apiClient.get_run_count(account_id) + 1
                         apiClient.log_session_run(
@@ -559,6 +583,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                 # was off), then drop this thread's session tag/buffer.
                 flush_session_log(account_id)
                 clear_session_context()
+                limit.end_session()
 
         else:
             # IDLE STATE

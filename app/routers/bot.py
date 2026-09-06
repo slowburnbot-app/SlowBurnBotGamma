@@ -33,8 +33,16 @@ from app.models.user import User
 from app.models.user_config import UserConfig
 from app.schemas.account import AccountRead
 from app.schemas.account_settings import AccountSettingsRead
+from app.schemas.action_limit import (
+    ActionLimitCreate,
+    ActiveActionLimit,
+    ReleasedLimit,
+    StatusPageCheckCreate,
+    StatusPageCheckResult,
+)
 from app.schemas.bot import (
     ActivityLogCreate,
+    BotSettingsRead,
     BotUserConfigRead,
     BotUserConfigUpdate,
     BotNotifyRequest,
@@ -52,6 +60,7 @@ from app.schemas.bot import (
 )
 from app.schemas.desktop_build import DesktopActivateRequest
 from app.schemas.follow_seed import BotFollowSeedCreate, BotFollowSeedUpdate, FollowSeedListRead, FollowSeedRead
+from app.services.action_limits import active_limits, record_action_limit, record_status_page_check
 from app.services.follow_seeds import list_seeds, normalize_handle, seed_stats_by_handle, seed_to_dict
 from app.services.notifications import NotificationError, send_email, send_sms
 from app.settings import settings
@@ -219,11 +228,18 @@ async def get_client_state(
                 for s in retry_new:
                     await session.refresh(s)
 
+    # Active action-limit cooldowns, one query for all accounts. They enter the
+    # payload hash below, so a new or shortened cooldown busts the client cache.
+    limits_by_id = await active_limits(session, [a.id for a in accounts])
+
     # Build serialisable account list
     account_states: list[ClientAccountState] = []
     for account in accounts:
         acct_read = AccountRead.model_validate(account, from_attributes=True).model_copy(
-            update={"has_password": account.ig_password_enc is not None}
+            update={
+                "has_password": account.ig_password_enc is not None,
+                "action_limits": limits_by_id.get(account.id, []),
+            }
         )
         s = settings_by_id.get(account.id)
         s_read = AccountSettingsRead.model_validate(s, from_attributes=True) if s else None
@@ -296,14 +312,18 @@ async def post_bot_notify(
     return {"ok": True}
 
 
-@router.get("/settings/{account_id}")
+@router.get("/settings/{account_id}", response_model=BotSettingsRead)
 async def get_bot_settings(
     account_id: uuid.UUID,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
     _: Subscription = Depends(require_active_subscription),
 ):
-    """Fetch account settings for the exe — requires active subscription."""
+    """Fetch account settings for the exe — requires active subscription.
+
+    Also carries the account's active action-limit cooldowns and the time of
+    its last Account Status read, so the run-start fetch tells the bot which
+    actions to skip and whether the daily status check is due."""
     account = await _assert_account_owned(account_id, user, session)
     result = await session.execute(
         select(AccountSettings).where(AccountSettings.account_id == account_id)
@@ -319,7 +339,51 @@ async def get_bot_settings(
                 select(AccountSettings).where(AccountSettings.account_id == account_id)
             )
             settings = result.scalar_one()
-    return settings
+    limits = await active_limits(session, [account.id])
+    return BotSettingsRead(
+        **AccountSettingsRead.model_validate(settings, from_attributes=True).model_dump(),
+        action_limits=limits.get(account.id, []),
+        status_page_checked_at=account.status_page_checked_at,
+    )
+
+
+@router.post("/action-limit", response_model=ActiveActionLimit, status_code=status.HTTP_201_CREATED)
+async def post_action_limit(
+    body: ActionLimitCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+    _: Subscription = Depends(require_active_subscription),
+):
+    """The exe detected Instagram limiting an action. Hard-tier reports start
+    an escalating cooldown; the reply carries `until` and the strike count."""
+    account = await _assert_account_owned(body.account_id, user, session)
+    row = await record_action_limit(
+        session, account, body.action, body.tier, body.reason, body.details
+    )
+    return ActiveActionLimit.model_validate(row)
+
+
+@router.post("/status-page-check", response_model=StatusPageCheckResult)
+async def post_status_page_check(
+    body: StatusPageCheckCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+    _: Subscription = Depends(require_active_subscription),
+):
+    """The exe read Instagram's Account Status pages. A clean read shortens
+    any repeat (48h/72h) cooldown that has already run 24h back to 24h."""
+    account = await _assert_account_owned(body.account_id, user, session)
+    released = await record_status_page_check(session, account, body.clean)
+    if body.text:
+        session.add(ActivityLog(
+            account_id=account.id, user_id=user.id, kind="status_page",
+            action="account-status", status=account.status_page_result,
+            details=body.text,
+        ))
+        await session.commit()
+    return StatusPageCheckResult(
+        released=[ReleasedLimit(action=r.action, until=r.until) for r in released]
+    )
 
 
 @router.post("/session-log", status_code=status.HTTP_201_CREATED)

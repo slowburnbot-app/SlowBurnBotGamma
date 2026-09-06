@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.account import AccountRead
 from app.schemas.account_settings import AccountSettingsRead
+from app.schemas.action_limit import ActiveActionLimit
 
 
 class SessionLogCreate(BaseModel):
@@ -105,6 +106,14 @@ class BotUserConfigUpdate(BaseModel):
 
 class ClientAccountState(AccountRead):
     settings: AccountSettingsRead | None = None
+
+
+class BotSettingsRead(AccountSettingsRead):
+    """GET /bot/settings/{account_id}: the settings row plus the account's
+    active action-limit cooldowns and last Account Status read, so one
+    run-start fetch tells the bot what to skip."""
+    action_limits: list[ActiveActionLimit] = []
+    status_page_checked_at: datetime | None = None
 
 
 class ClientStateRead(BaseModel):

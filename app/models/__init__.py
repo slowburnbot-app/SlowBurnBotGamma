@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.account import Account
 from app.models.account_settings import AccountSettings
+from app.models.action_limit import ActionLimit
 from app.models.subscription import Subscription
 from app.models.session_log import SessionLog
 from app.models.activity_log import ActivityLog
@@ -18,6 +19,7 @@ __all__ = [
     "User",
     "Account",
     "AccountSettings",
+    "ActionLimit",
     "Subscription",
     "SessionLog",
     "ActivityLog",

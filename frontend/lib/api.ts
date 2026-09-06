@@ -90,6 +90,10 @@ export async function getAccountSettings(id: string) {
   return request<AccountSettings>(`/accounts/${id}/settings`);
 }
 
+export async function getAccountActionLimits(id: string, limit = 20) {
+  return request<ActionLimitEvent[]>(`/accounts/${id}/action-limits?limit=${limit}`);
+}
+
 export async function saveAccountSettings(id: string, data: Partial<AccountSettings>) {
   return request<AccountSettings>(`/accounts/${id}/settings`, {
     method: "PUT",
@@ -409,6 +413,22 @@ export interface User {
   is_superuser: boolean;
 }
 
+/** An Instagram action-limit cooldown in force on an account (mirrors app/schemas/action_limit.py). */
+export interface ActionLimit {
+  action: string;          // like | follow | unfollow | all
+  tier: string;            // soft | hard | status_page
+  reason: string;
+  strike: number;
+  until: string | null;    // ISO UTC; null for history-only rows
+  created_at: string;
+}
+
+export interface ActionLimitEvent extends ActionLimit {
+  id: string;
+  cleared_at: string | null;
+  cleared_reason: string | null;
+}
+
 export interface Account {
   id: string;
   user_id: string;
@@ -419,6 +439,9 @@ export interface Account {
   has_password: boolean;
   proxy_enabled: boolean;
   proxy_type: string | null;
+  action_limits: ActionLimit[];
+  status_page_checked_at: string | null;
+  status_page_result: string | null;
   created_at: string;
   updated_at: string;
 }

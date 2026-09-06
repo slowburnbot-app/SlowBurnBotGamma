@@ -5,6 +5,7 @@ from burnBot_imports import *
 from burnBot_human import hsleep, htype, hclick, hhover, hscroll
 from burnBot_utils import process_exception
 from burnBot_client_log import client_log_line
+import burnBot_actionLimit as limit
 from datetime import date, datetime, timedelta
 import random
 import time
@@ -121,6 +122,11 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
     unfollows_performed = 0
     moduleErrorsLog = ""
     moduleWarningsLog = ""
+
+    _blocked, _why = limit.is_action_blocked("unfollow")
+    if _blocked:
+        _p(client_log_line(account, _log_scope, f"{_lbl}skipped - action limit ({_why})"))
+        return 0, moduleErrorsLog, moduleWarningsLog
 
     try:
         today = date.today()
@@ -277,6 +283,7 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
                         follow_button = account_box.find_element(By.XPATH, ".//button[.//div[contains(text(), 'ollow')]]")
 
                         # Click to trigger unfollow modal
+                        _marker = limit.mark(driver)
                         hclick(driver, follow_button)
                         hsleep(3, 5)
 
@@ -285,6 +292,12 @@ def do_unfollow_database(driver, account, target_count, apiClient, account_id, u
                             EC.element_to_be_clickable((By.CLASS_NAME, "_a9-_"))
                         )
                         hclick(driver, unfollow_confirm)
+                        hsleep(1.5, 2.5)
+
+                        # Block dialog / rejected request after the confirm —
+                        # a hard action limit stops unfollowing for this run.
+                        if limit.after_click(driver, "unfollow", _marker, context=f"unfollow {loop_username}"):
+                            return unfollows_performed, moduleErrorsLog, moduleWarningsLog
 
                         # The confirm click landed — this is a genuine unfollow,
                         # not just an attempt. Count it here, not per-loop-iteration.

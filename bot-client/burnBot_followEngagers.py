@@ -41,6 +41,7 @@ from burnBot_seeds import load_seed_pool, order_seeds, finish_seed_use, maybe_di
 import burnBot_likePostsTopic as _lpt
 from burnBot_likePostsTopic import _open_topic_search_results
 import burnBot_status as status_store
+import burnBot_actionLimit as limit
 
 _p = _builtins.print  # set per-call by do_follow_engagers; safe because sessions run sequentially
 
@@ -239,10 +240,19 @@ def _harvest_post_likers(driver, account, remaining, apiClient, account_id, sour
                     skip_filtered += 1
                     continue
 
-                try:
-                    hclick(driver, follow_button)
-                except Exception:
-                    driver.execute_script("arguments[0].click();", follow_button)
+                _outcome = limit.follow_and_verify(driver, follow_button, context=f"{source} {user_name}")
+                if _outcome == "blocked":
+                    return followed, skip_known, skip_filtered, errors
+                if _outcome == "reverted":
+                    _p(client_log_line(account, scope, f"{source}-[-skip] - [{user_name}] - [follow reverted]"))
+                    limit.record_revert("follow", context=f"{source} {user_name}")
+                    if limit.is_action_blocked("follow")[0]:
+                        return followed, skip_known, skip_filtered, errors
+                    hsleep(10, 20)
+                    continue
+                if _outcome != "following":
+                    debug_line(client_log_line(account, scope, f"skip @{user_name} reason=follow_{_outcome}"))
+                    continue
 
                 followed += 1
                 known.add(user_name)
@@ -305,6 +315,11 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
     followed_count = 0
     module_errors_log = ""
     module_warnings_log = ""
+
+    _blocked, _why = limit.is_action_blocked("follow")
+    if _blocked:
+        _p(client_log_line(account, _scope, f"{_lbl}skipped - action limit ({_why})"))
+        return 0, module_errors_log, module_warnings_log
 
     try:
         follow_date = date.today()
@@ -392,9 +407,16 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                     seed_filtered += s
                     module_errors_log += errs
                     _p(client_log_line(account, _scope, f"{_lbl}post done: +{f} follow(s), {k} known, {s} filtered [{followed_count:02d}/{target_count:02d}]"))
+                    if limit.is_action_blocked("follow")[0]:
+                        break
                 except Exception as e:
                     module_errors_log += process_exception(True, f"post {post_url} failed: {e}", True, False)
                     continue
+
+            if limit.is_action_blocked("follow")[0]:
+                # Action limit tripped mid-seed: not a seed-quality signal,
+                # so skip the saturation bookkeeping and stop following.
+                break
 
             if seed_dialogs == 0 and not status_store.is_bot_paused():
                 # Every post refused a likers dialog — the seed hides like counts (or the

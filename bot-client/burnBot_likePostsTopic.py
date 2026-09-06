@@ -11,6 +11,7 @@ from burnBot_utils import process_exception, get_post_author_username
 from burnBot_accountSession_setup import is_bot_debug_enabled
 from burnBot_client_log import client_log_line
 from burnBot_run_log import capture_failure_context, report_failure, debug_line
+import burnBot_actionLimit as limit
 import random
 import time
 from urllib.parse import quote
@@ -608,6 +609,11 @@ def do_like_posts_topic(driver, account, target_count, apiClient=None, account_i
         moduleErrorsLog += f"like[topics]: {msg}\n"
         return 0, moduleErrorsLog, moduleWarningsLog
 
+    _blocked, _why = limit.is_action_blocked("like")
+    if _blocked:
+        _p(client_log_line(account, _scope, f"{_lbl}skipped - action limit ({_why})"))
+        return 0, moduleErrorsLog, moduleWarningsLog
+
     # Load like_sponsored setting from API (suggested posts don't appear on hashtag pages)
     _user_cfg = apiClient.get_user_config() if apiClient else {}
     like_sponsored = _user_cfg.get('like_sponsored', True)
@@ -834,6 +840,7 @@ def do_like_posts_topic(driver, account, target_count, apiClient=None, account_i
                                     pass
 
                                 clicked = False
+                                _marker = limit.mark(driver)
                                 try:
                                     hclick(driver, like_button)
                                     clicked = True
@@ -848,18 +855,36 @@ def do_like_posts_topic(driver, account, target_count, apiClient=None, account_i
                                         pass
 
                                 if clicked:
+                                    _unlike_xpath = ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Unlike']]"
                                     try:
                                         WebDriverWait(article, 6).until(
-                                            lambda a: len(a.find_elements(
-                                                By.XPATH,
-                                                ".//section//*[@role='button'][.//*[local-name()='svg' and @aria-label='Unlike']]"
-                                            )) > 0
+                                            lambda a: len(a.find_elements(By.XPATH, _unlike_xpath)) > 0
                                         )
+                                        flipped = True
+                                    except Exception:
+                                        flipped = False
+
+                                    # Block dialog / rejected request (checked after
+                                    # the flip wait — the dialog lands with the API
+                                    # response). A hard action limit stops likes for
+                                    # the run.
+                                    if limit.after_click(driver, "like", _marker, context=f"topic {topic} {post_url}"):
+                                        return likes_performed, moduleErrorsLog, moduleWarningsLog
+
+                                    if flipped and limit.like_reverted(article, _unlike_xpath):
+                                        # Flipped then snapped back: Instagram rejected
+                                        # the like (soft action-limit signal).
+                                        debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_reverted"))
+                                        limit.record_revert("like", context=f"topic {topic} {post_url}")
+                                        if limit.is_action_blocked("like")[0]:
+                                            return likes_performed, moduleErrorsLog, moduleWarningsLog
+                                        hsleep(3, 4)
+                                    elif flipped:
                                         likes_performed += 1
                                         count_formatted = f"{likes_performed:02d}"
                                         _p(client_log_line(account, _scope, f"{_lbl}[{count_formatted}/{target_formatted}] - [{display_name}]"))
-                                        hsleep(6, 8)
-                                    except Exception:
+                                        hsleep(3, 4)   # remainder of the old 6-8s pause (re-check took the rest)
+                                    else:
                                         debug_line(client_log_line(account, _scope, f"skip @{display_name} reason=like_state_unchanged"))
                                         if like_diag_reports < _MAX_LIKE_DIAG_REPORTS:
                                             like_diag_reports += 1

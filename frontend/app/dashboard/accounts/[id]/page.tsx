@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   getAccounts,
   getAccountSettings,
+  getAccountActionLimits,
   saveAccountSettings,
   updateAccount,
   deleteAccount,
@@ -16,9 +17,11 @@ import {
   Account,
   AccountSettings,
   ActionBlock,
+  ActionLimitEvent,
   FollowSeed,
 } from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
+import { fmtLimitUntil } from "@/lib/action-limit-badge";
 import { BracketCheckbox } from "@/lib/bracket-checkbox";
 import { formatTime } from "@/lib/format";
 import { Dropdown } from "@/lib/dropdown";
@@ -110,6 +113,7 @@ export default function AccountDetailPage() {
   const [seeds, setSeeds] = useState<FollowSeed[]>([]);
   const [newSeed, setNewSeed] = useState("");
   const [seedMsg, setSeedMsg] = useState("");
+  const [limitEvents, setLimitEvents] = useState<ActionLimitEvent[]>([]);
 
   const refreshSeeds = useCallback(() => {
     getFollowSeeds(id).then((r) => setSeeds(r.items)).catch(() => {});
@@ -169,6 +173,7 @@ export default function AccountDetailPage() {
       .catch((err: unknown) => {
         setLoadError(err instanceof Error ? err.message : "failed to load settings.");
       });
+    getAccountActionLimits(id, 10).then(setLimitEvents).catch(() => {});
   }, [id, router]);
 
   async function handleSaveSettings(e: React.FormEvent) {
@@ -307,6 +312,61 @@ export default function AccountDetailPage() {
               )}
             </span>
 
+          </div>
+        </div>
+
+        {/* Action limits — read-only: Instagram throttling detected by the bot.
+            Not part of the form's save semantics (no inputs). */}
+        <div className={sectionCls}>
+          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">action limits</div>
+          <div className="px-4 py-3 space-y-2">
+            <div className="grid gap-x-3 gap-y-1" style={{ gridTemplateColumns: "9ch auto" }}>
+              {(["like", "follow", "unfollow"] as const).map((verb) => {
+                const active = account.action_limits?.find((l) => l.action === verb);
+                return (
+                  <span key={verb} className="contents">
+                    <span className="text-base04">{verb}:</span>
+                    {active ? (
+                      <span>
+                        <span className="text-base05">{"["}</span>
+                        <span className="text-status-warning">{`limited until ${fmtLimitUntil(active.until)}`}</span>
+                        <span className="text-base05">{"]"}</span>
+                        <span className="text-base04">{` strike ${active.strike} — ${active.reason || active.tier}`}</span>
+                      </span>
+                    ) : (
+                      <Bracket className="text-base04">------</Bracket>
+                    )}
+                  </span>
+                );
+              })}
+              <span className="text-base04">status page:</span>
+              <span>
+                {account.status_page_checked_at ? (
+                  <>
+                    <Bracket className={account.status_page_result === "clean" ? "text-status-ok" : "text-status-warning"}>
+                      {account.status_page_result ?? "?"}
+                    </Bracket>
+                    <span className="text-base04">{` checked ${fmtLimitUntil(account.status_page_checked_at)}`}</span>
+                  </>
+                ) : (
+                  <Bracket className="text-base04">------</Bracket>
+                )}
+              </span>
+            </div>
+            {limitEvents.length > 0 && (
+              <div className="pt-2 border-t border-base03 space-y-0.5">
+                <div className="text-base04">recent events</div>
+                {limitEvents.map((ev) => (
+                  <div key={ev.id} className="text-base04 whitespace-nowrap overflow-hidden text-ellipsis">
+                    <span className="text-base05">{fmtLimitUntil(ev.created_at)}</span>
+                    {` ${ev.action} ${ev.tier}`}
+                    {ev.until ? ` → until ${fmtLimitUntil(ev.until)} (strike ${ev.strike})` : ""}
+                    {ev.reason ? ` — ${ev.reason}` : ""}
+                    {ev.cleared_reason ? ` [${ev.cleared_reason}]` : ""}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
