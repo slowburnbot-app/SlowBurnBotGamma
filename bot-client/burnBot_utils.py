@@ -250,7 +250,8 @@ def check_schedule(scheduleDays, scheduleStart, scheduleEnd):
     Check if current time/day matches the schedule settings.
     
     Args:
-        scheduleDays: String - "daily", "weekdays", or "weekend"
+        scheduleDays: String - "daily", "weekdays", "weekend"/"weekends",
+            or "random 1/3"/"random 2/3"
         scheduleStart: String - Start time in "9:00 AM" format
         scheduleEnd: String - End time in "5:00 PM" format
     
@@ -278,8 +279,10 @@ def check_schedule(scheduleDays, scheduleStart, scheduleEnd):
         elif scheduleDays_lower == "weekdays":
             # Monday (0) through Friday (4)
             day_match = current_weekday < 5
-        elif scheduleDays_lower == "weekend":
-            # Saturday (5) and Sunday (6)
+        elif scheduleDays_lower in ("weekend", "weekends"):
+            # Saturday (5) and Sunday (6). The frontend dropdown sends the
+            # plural "weekends"; accept both spellings so this never falls
+            # through to the fail-open branch below.
             day_match = current_weekday >= 5
         elif scheduleDays_lower in ("random 1/3", "random 2/3"):
             # Deterministic daily dice roll — same result for all checks on the same calendar day
@@ -291,7 +294,7 @@ def check_schedule(scheduleDays, scheduleStart, scheduleEnd):
             day_match = rng.random() < threshold
         else:
             # Unknown day format - allow execution (fail-safe)
-            print(f"[schedule]: Warning - Unknown day format: {scheduleDays}, allowing execution")
+            builtins.print(client_log_line(None, "schedule", f"Warning - Unknown day format: {scheduleDays}, allowing execution"))
             day_match = True
         
         if not day_match:
