@@ -182,15 +182,16 @@ export default function ConfigPage() {
           </span>
         </div>
 
-        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
-          <span className="text-base04">follow filters (0 = off):</span>
+        {/* Dense row (tight gaps and input padding) so the 3 filters stay on one line. */}
+        <div className="px-4 py-3 flex items-center gap-x-2 gap-y-2 flex-wrap">
+          <span className="text-base04">follow filters (0=off):</span>
           <span className="inline-flex items-center gap-0">
             <span className="text-base04">{"max followers: "}</span>
             <span className="text-base05">{"["}</span>
             <NumberInput
               value={maxFollowers}
               onChange={setMaxFollowers}
-              placeholder="0" max={9999999} maxLength={7}
+              placeholder="0" max={9999999} maxLength={7} padding="0"
             />
             <span className="text-base05">{"]"}</span>
           </span>
@@ -200,7 +201,7 @@ export default function ConfigPage() {
             <NumberInput
               value={minFollowRatioPct}
               onChange={setMinFollowRatioPct}
-              placeholder="0" max={999} maxLength={3}
+              placeholder="0" max={999} maxLength={3} padding="0"
             />
             <span className="text-base05">{"]"}</span>
           </span>
@@ -210,7 +211,7 @@ export default function ConfigPage() {
             <NumberInput
               value={minPosts}
               onChange={setMinPosts}
-              placeholder="0" max={999} maxLength={3}
+              placeholder="0" max={999} maxLength={3} padding="0"
             />
             <span className="text-base05">{"]"}</span>
           </span>

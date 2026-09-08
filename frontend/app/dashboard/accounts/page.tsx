@@ -21,7 +21,7 @@ import {
 } from "@/lib/api";
 import { scheduleLabel } from "@/lib/format";
 import { Bracket } from "@/lib/bracket";
-import { ActionLimitBadges } from "@/lib/action-limit-badge";
+import { ActionLimitBadges, LimitCell, StatusPageCell } from "@/lib/action-limit-badge";
 import { BracketInput } from "@/lib/bracket-input";
 import { Dropdown } from "@/lib/dropdown";
 
@@ -59,7 +59,7 @@ function fmtPct(v: number | null): string {
   return `${Math.round(v * 100)}%`;
 }
 
-type Tab = "settings" | "activity" | "stats" | "database";
+type Tab = "settings" | "activity" | "stats" | "database" | "status";
 type SortKey = "name" | "enabled" | "group" | "following" | "unfollow_ready" | "complete" | "ignored" | "total" | "success" | "last_25" | "all_time" | "sessions" | "likes" | "follows" | "unfollows" | "fb_rate" | "followed" | "followed_back" | "fb_complete" | "fb_daily";
 type SortDir = "asc" | "desc";
 type Period = "day" | "week" | "month" | "all";
@@ -77,7 +77,7 @@ export default function AccountsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "settings" || t === "activity" || t === "stats" || t === "database") {
+    if (t === "settings" || t === "activity" || t === "stats" || t === "database" || t === "status") {
       setTab(t);
     }
   }, []);
@@ -230,6 +230,7 @@ export default function AccountsPage() {
     { key: "activity", label: "activity" },
     { key: "stats", label: "stats" },
     { key: "database", label: "database" },
+    { key: "status", label: "account status" },
   ];
 
   return (
@@ -295,6 +296,14 @@ export default function AccountsPage() {
                     <SortTh label="Ignored" field="ignored" className="whitespace-nowrap" />
                     <SortTh label="Total" field="total" className="whitespace-nowrap" />
                     <SortTh label="Success" field="success" className="whitespace-nowrap" />
+                  </>
+                )}
+                {tab === "status" && (
+                  <>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Like</th>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Follow</th>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Unfollow</th>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Status Page</th>
                   </>
                 )}
                 <th className="px-[6px] py-2 font-normal w-full text-right whitespace-nowrap">
@@ -396,6 +405,14 @@ export default function AccountsPage() {
                         <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.success)}</td>
                       </>
                     )}
+                    {tab === "status" && (
+                      <>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="like" /></td>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="follow" /></td>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="unfollow" /></td>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><StatusPageCell account={account} /></td>
+                      </>
+                    )}
                     <td className="px-[6px] py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {tab === "settings" && (
@@ -416,6 +433,11 @@ export default function AccountsPage() {
                         {tab === "database" && (
                           <Link href={`/dashboard/accounts/${account.id}/database`} className="group font-mono transition-colors">
                             <Bracket className="text-base04 group-hover:text-base0d">data</Bracket>
+                          </Link>
+                        )}
+                        {tab === "status" && (
+                          <Link href={`/dashboard/accounts/${account.id}/status`} className="group font-mono transition-colors">
+                            <Bracket className="text-base04 group-hover:text-base0d">status</Bracket>
                           </Link>
                         )}
                       </div>

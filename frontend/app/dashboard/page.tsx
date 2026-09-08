@@ -27,7 +27,7 @@ import {
 } from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
 import { Dropdown } from "@/lib/dropdown";
-import { ActionLimitBadges } from "@/lib/action-limit-badge";
+import { ActionLimitBadges, LimitCell, StatusPageCell } from "@/lib/action-limit-badge";
 import { scheduleLabel, formatSessionAction } from "@/lib/format";
 
 function fmtTime(iso: string | null): string {
@@ -74,7 +74,7 @@ function fmtPct(v: number | null): string {
   return `${Math.round(v * 100)}%`;
 }
 
-type Tab = "settings" | "activity" | "stats" | "database";
+type Tab = "settings" | "activity" | "stats" | "database" | "status";
 type SortKey = "name" | "enabled" | "group" | "following" | "unfollow_ready" | "complete" | "ignored" | "total" | "success" | "last_25" | "all_time" | "sessions" | "likes" | "follows" | "unfollows" | "fb_complete" | "followed_back" | "fb_rate" | "fb_daily";
 type SortDir = "asc" | "desc";
 type Period = "day" | "week" | "month";
@@ -255,6 +255,7 @@ export default function DashboardPage() {
     { key: "activity", label: "activity" },
     { key: "stats", label: "stats" },
     { key: "database", label: "database" },
+    { key: "status", label: "account status" },
   ];
 
   return (
@@ -403,6 +404,14 @@ export default function DashboardPage() {
                     <SortTh label="Success" field="success" className="whitespace-nowrap" />
                   </>
                 )}
+                {tab === "status" && (
+                  <>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Like</th>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Follow</th>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Unfollow</th>
+                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Status Page</th>
+                  </>
+                )}
                 <th className="px-[6px] py-2 font-normal w-full text-right whitespace-nowrap">
                   {tab === "activity" && (
                     <span className="inline-flex items-center gap-0">
@@ -499,6 +508,14 @@ export default function DashboardPage() {
                         <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.success)}</td>
                       </>
                     )}
+                    {tab === "status" && (
+                      <>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="like" /></td>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="follow" /></td>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="unfollow" /></td>
+                        <td className="px-[6px] py-2 whitespace-nowrap"><StatusPageCell account={account} /></td>
+                      </>
+                    )}
                     <td className="px-[6px] py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {tab === "settings" && (
@@ -519,6 +536,11 @@ export default function DashboardPage() {
                         {tab === "database" && (
                           <Link href={`/dashboard/accounts/${account.id}/database`} className="group font-mono transition-colors">
                             <Bracket className="text-base04 group-hover:text-base0d">data</Bracket>
+                          </Link>
+                        )}
+                        {tab === "status" && (
+                          <Link href={`/dashboard/accounts/${account.id}/status`} className="group font-mono transition-colors">
+                            <Bracket className="text-base04 group-hover:text-base0d">status</Bracket>
                           </Link>
                         )}
                       </div>

@@ -7,6 +7,8 @@ interface NumberInputProps {
   maxLength?: number;
   max?: number;
   className?: string;
+  /** Horizontal padding inside the brackets; "0.5ch" for dense rows. */
+  padding?: string;
 }
 
 function parseNum(v: string): number {
@@ -21,6 +23,7 @@ export function NumberInput({
   maxLength = 2,
   max = 99,
   className = "",
+  padding = "1ch",
 }: NumberInputProps) {
   return (
     <input
@@ -33,7 +36,7 @@ export function NumberInput({
       }}
       placeholder={placeholder}
       maxLength={maxLength}
-      style={{ width: `${maxLength}ch`, paddingLeft: "1ch", paddingRight: "1ch", boxSizing: "content-box" }}
+      style={{ width: `${maxLength}ch`, paddingLeft: padding, paddingRight: padding, boxSizing: "content-box" }}
       className={`bg-transparent text-base05 outline-none font-mono placeholder-base04 text-center ${className}`}
     />
   );
