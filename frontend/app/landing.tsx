@@ -199,7 +199,7 @@ export function Landing() {
         </header>
 
         <main className="px-3 sm:px-6 py-6 space-y-8">
-          <section className="space-y-3 max-w-3xl">
+          <section className="space-y-3">
             <h1 className="text-2xl sm:text-3xl text-base05 leading-snug">
               grow your social presence —{" "}
               <span className="text-base0d">steadily, consistently, and without the daily grind.</span>
