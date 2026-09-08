@@ -28,8 +28,12 @@ const HEX6 = /^#?[0-9a-fA-F]{6}$/;
 
 /**
  * Loads a tinted-theming base24 YAML scheme from frontend/themes/.
+ * Server-only: this is how the root layout injects the SSR default
+ * (slowburnbot.yaml) before paint. The catalog users choose from lives in
+ * the database (curated at /admin/themes, served by the backend /themes API);
+ * the `slowburnbot` row there must match this file.
  * Throws if the file is missing, malformed, or any of the 24 slots is invalid.
- * No silent fallback — the YAML is the single source of truth.
+ * No silent fallback — the YAML is the single source of truth for the default.
  */
 export function loadTheme(slug: string): LoadedTheme {
   const filePath = path.join(process.cwd(), "themes", `${slug}.yaml`);

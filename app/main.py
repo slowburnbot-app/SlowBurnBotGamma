@@ -10,7 +10,7 @@ from app.auth import ACCESS_TOKEN_LIFETIME, auth_backend, fastapi_users
 from app.database import async_session_maker
 from app.models.access_token import AccessToken
 from app.models.system_config import SystemConfig
-from app.routers import accounts, admin, auth_refresh, bot, config, desktop_builds, public, subscription, webhooks
+from app.routers import accounts, admin, auth_refresh, bot, config, desktop_builds, public, subscription, themes, webhooks
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.services import github_actions, object_storage
 from app.settings import settings
@@ -124,6 +124,7 @@ app.include_router(subscription.router)
 app.include_router(webhooks.router)
 app.include_router(desktop_builds.router)
 app.include_router(public.router)
+app.include_router(themes.router)
 
 
 @app.get("/health")

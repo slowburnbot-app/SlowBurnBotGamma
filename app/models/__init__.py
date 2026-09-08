@@ -15,6 +15,7 @@ from app.models.account_request import AccountRequest
 from app.models.client_heartbeat import ClientHeartbeat
 from app.models.processed_stripe_event import ProcessedStripeEvent
 from app.models.access_token import AccessToken
+from app.models.theme import Theme
 
 __all__ = [
     "User",
@@ -34,4 +35,5 @@ __all__ = [
     "ClientHeartbeat",
     "ProcessedStripeEvent",
     "AccessToken",
+    "Theme",
 ]

@@ -1,53 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createCheckoutSession, createPortalSession, getSubscriptionInfo, SubscriptionInfo } from "@/lib/api";
+import {
+  createCheckoutSession,
+  createPortalSession,
+  getSubscriptionInfo,
+  getTheme,
+  listThemes,
+  SubscriptionInfo,
+  Theme,
+} from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
 import { ACTIVE_THEME } from "@/lib/active-theme";
-import { getStoredTheme, setStoredTheme, applyThemeCss } from "@/lib/theme-store";
-
-type ThemeEntry = {
-  slug: string;
-  name: string;
-  preview: Record<string, string>;
-};
+import { paletteCss } from "@/lib/base24";
+import { getStoredTheme, setStoredTheme, clearStoredTheme, applyThemeCss } from "@/lib/theme-store";
 
 const SWATCH_SLOTS = ["base00", "base08", "base0A", "base0B", "base0E", "base05"];
 
 function ThemeSelector() {
-  const [themes, setThemes] = useState<ThemeEntry[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
   const [applied, setApplied] = useState<string | null>(null);
 
   useEffect(() => {
     setApplied(getStoredTheme() ?? ACTIVE_THEME);
-    fetch("/api/themes")
-      .then((r) => r.json())
-      .then(setThemes)
-      .catch(() => {});
+    listThemes().then(setThemes).catch(() => {});
   }, []);
 
   function apply(slug: string) {
-    fetch(`/api/themes/${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.css) {
-          applyThemeCss(data.css);
-          setStoredTheme(slug);
-          setApplied(slug);
-        }
+    getTheme(slug)
+      .then((t) => {
+        applyThemeCss(paletteCss(t.palette));
+        setStoredTheme(slug);
+        setApplied(slug);
       })
       .catch(() => {});
   }
 
   function reset() {
-    fetch(`/api/themes/${encodeURIComponent(ACTIVE_THEME)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.css) {
-          applyThemeCss(data.css);
-          import("@/lib/theme-store").then(({ clearStoredTheme }) => clearStoredTheme());
-          setApplied(ACTIVE_THEME);
-        }
+    getTheme(ACTIVE_THEME)
+      .then((t) => {
+        applyThemeCss(paletteCss(t.palette));
+        clearStoredTheme();
+        setApplied(ACTIVE_THEME);
       })
       .catch(() => {});
   }
@@ -95,7 +89,7 @@ function ThemeSelector() {
                           style={{
                             width: "18px",
                             height: "18px",
-                            backgroundColor: t.preview[slot] ?? "#000",
+                            backgroundColor: t.palette[slot] ?? "#000",
                             borderRadius: "2px",
                             flexShrink: 0,
                           }}

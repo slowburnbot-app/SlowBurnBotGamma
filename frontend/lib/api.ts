@@ -468,6 +468,39 @@ export async function adminDeleteAccountRequest(requestId: string) {
   return request<void>(`/admin/account-requests/${requestId}`, { method: "DELETE" });
 }
 
+// Themes (base24 catalog — read side is public, curated at /admin/themes)
+export interface Theme {
+  id: string;
+  name: string;
+  slug: string;
+  variant: "dark" | "light";
+  author: string | null;
+  palette: Record<string, string>;
+  created_at: string;
+}
+
+export async function listThemes() {
+  return request<Theme[]>("/themes");
+}
+
+export async function getTheme(slug: string) {
+  return request<Theme>(`/themes/${encodeURIComponent(slug)}`);
+}
+
+export async function adminCreateTheme(data: {
+  name: string;
+  slug: string;
+  variant: "dark" | "light";
+  author?: string | null;
+  palette: Record<string, string>;
+}) {
+  return request<Theme>("/admin/themes", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function adminDeleteTheme(themeId: string) {
+  return request<void>(`/admin/themes/${themeId}`, { method: "DELETE" });
+}
+
 // Types
 export interface User {
   id: string;

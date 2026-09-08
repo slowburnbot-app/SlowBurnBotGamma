@@ -19,9 +19,11 @@ from app.models.follow_target import FollowTarget
 from app.models.invite_code import InviteCode
 from app.models.subscription import Subscription
 from app.models.system_config import SystemConfig
+from app.models.theme import DEFAULT_THEME_SLUG, Theme
 from app.models.user import User
 from app.plan_tiers import is_valid_tier
 from app.schemas.admin import NotificationCredentialsRead, NotificationCredentialsUpdate
+from app.schemas.theme import ThemeCreate, ThemeRead
 from app.services.email import send_invite_email
 from app.services.plan_enforcement import enforce_account_limits
 from app.services.stripe_sync import apply_stripe_subscription
@@ -609,3 +611,48 @@ async def sync_bot_version(
         "image_ready": True,
         "macos_ready": macos_ready,
     }
+
+
+# --- Theme catalog (read side is public, see routers/themes.py) ---
+
+
+@router.post("/themes", response_model=ThemeRead, status_code=status.HTTP_201_CREATED)
+async def create_theme(
+    body: ThemeCreate,
+    _: User = Depends(current_superuser),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Add a base24 scheme to the catalog. Palette is strictly validated by the schema."""
+    existing = await session.scalar(select(Theme.id).where(Theme.slug == body.slug))
+    if existing is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=f"A theme with slug '{body.slug}' already exists",
+        )
+    theme = Theme(
+        name=body.name.strip(),
+        slug=body.slug,
+        variant=body.variant,
+        author=(body.author or "").strip() or None,
+        palette=body.palette,
+    )
+    session.add(theme)
+    await session.commit()
+    await session.refresh(theme)
+    return theme
+
+
+@router.delete("/themes/{theme_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_theme(
+    theme_id: uuid.UUID,
+    _: User = Depends(current_superuser),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Remove a theme. Visitors who had picked it fall back to the default on next load."""
+    theme = await session.get(Theme, theme_id)
+    if theme is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Theme not found")
+    if theme.slug == DEFAULT_THEME_SLUG:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="The default theme cannot be deleted")
+    await session.delete(theme)
+    await session.commit()
