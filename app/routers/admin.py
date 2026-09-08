@@ -13,6 +13,7 @@ from app.auth import current_superuser
 from app.crypto import decrypt, encrypt
 from app.database import get_async_session
 from app.models.account import Account
+from app.models.account_request import AccountRequest
 from app.services import github_actions, object_storage
 from app.models.follow_target import FollowTarget
 from app.models.invite_code import InviteCode
@@ -316,6 +317,7 @@ async def get_notification_credentials(
         resend_api_key_set=config.resend_api_key_enc is not None,
         resend_from_address=config.resend_from_address,
         resend_reply_to=config.resend_reply_to,
+        admin_notify_email=config.admin_notify_email,
         updated_at=config.updated_at,
     )
 
@@ -345,6 +347,8 @@ async def update_notification_credentials(
         config.resend_from_address = body.resend_from_address or None
     if body.resend_reply_to is not None:
         config.resend_reply_to = body.resend_reply_to or None
+    if body.admin_notify_email is not None:
+        config.admin_notify_email = body.admin_notify_email or None
 
     await session.commit()
     await session.refresh(config)
@@ -358,6 +362,7 @@ async def update_notification_credentials(
         resend_api_key_set=config.resend_api_key_enc is not None,
         resend_from_address=config.resend_from_address,
         resend_reply_to=config.resend_reply_to,
+        admin_notify_email=config.admin_notify_email,
         updated_at=config.updated_at,
     )
 
@@ -440,6 +445,80 @@ async def delete_invite(
     if invite.used_by_user_id is not None:
         raise HTTPException(status_code=400, detail="Cannot revoke an already-used invite.")
     await session.delete(invite)
+    await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Account requests (public landing-page submissions)
+# ---------------------------------------------------------------------------
+
+ACCOUNT_REQUEST_STATUSES = ("new", "contacted", "invited", "declined")
+
+
+class AccountRequestStatusUpdate(BaseModel):
+    status: str
+
+
+def _request_dict(req: AccountRequest) -> dict:
+    return {
+        "id": str(req.id),
+        "name": req.name,
+        "email": req.email,
+        "company": req.company,
+        "industry": req.industry,
+        "account_count": req.account_count,
+        "instagram_handles": req.instagram_handles,
+        "notes": req.notes,
+        "status": req.status,
+        "created_at": req.created_at.isoformat(),
+        "handled_at": req.handled_at.isoformat() if req.handled_at else None,
+    }
+
+
+async def _get_account_request(request_id: uuid.UUID, session: AsyncSession) -> AccountRequest:
+    req = await session.scalar(select(AccountRequest).where(AccountRequest.id == request_id))
+    if req is None:
+        raise HTTPException(status_code=404, detail="Request not found.")
+    return req
+
+
+@router.get("/account-requests")
+async def list_account_requests(
+    _: User = Depends(current_superuser),
+    session: AsyncSession = Depends(get_async_session),
+):
+    result = await session.execute(
+        select(AccountRequest).order_by(AccountRequest.created_at.desc())
+    )
+    return [_request_dict(req) for req in result.scalars().all()]
+
+
+@router.patch("/account-requests/{request_id}")
+async def update_account_request_status(
+    request_id: uuid.UUID,
+    body: AccountRequestStatusUpdate,
+    _: User = Depends(current_superuser),
+    session: AsyncSession = Depends(get_async_session),
+):
+    if body.status not in ACCOUNT_REQUEST_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
+    req = await _get_account_request(request_id, session)
+    req.status = body.status
+    # "new" is the untouched state; anything else records when it was acted on.
+    req.handled_at = None if body.status == "new" else datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(req)
+    return _request_dict(req)
+
+
+@router.delete("/account-requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account_request(
+    request_id: uuid.UUID,
+    _: User = Depends(current_superuser),
+    session: AsyncSession = Depends(get_async_session),
+):
+    req = await _get_account_request(request_id, session)
+    await session.delete(req)
     await session.commit()
 
 

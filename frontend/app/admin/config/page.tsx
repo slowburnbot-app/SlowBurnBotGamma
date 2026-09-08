@@ -24,6 +24,7 @@ export default function AdminConfigPage() {
   const [resendFrom, setResendFrom] = useState("");
   const [resendReplyTo, setResendReplyTo] = useState("");
   const [resendApiKey, setResendApiKey] = useState("");
+  const [notifyEmail, setNotifyEmail] = useState("");
   const [editingSmtpPassword, setEditingSmtpPassword] = useState(false);
   const [editingTextbeltKey, setEditingTextbeltKey] = useState(false);
   const [editingResendApiKey, setEditingResendApiKey] = useState(false);
@@ -37,6 +38,7 @@ export default function AdminConfigPage() {
         setSmtpUser(c.smtp_user || "");
         setResendFrom(c.resend_from_address || "");
         setResendReplyTo(c.resend_reply_to || "");
+        setNotifyEmail(c.admin_notify_email || "");
       })
       .catch(() => {});
   }, []);
@@ -54,6 +56,7 @@ export default function AdminConfigPage() {
       if (textbeltKey) data.textbelt_key = textbeltKey;
       data.resend_from_address = resendFrom;
       data.resend_reply_to = resendReplyTo;
+      data.admin_notify_email = notifyEmail;
       if (resendApiKey) data.resend_api_key = resendApiKey;
 
       const updated = await adminUpdateNotificationCredentials(data);
@@ -63,6 +66,7 @@ export default function AdminConfigPage() {
       setResendApiKey("");
       setResendFrom(updated.resend_from_address || "");
       setResendReplyTo(updated.resend_reply_to || "");
+      setNotifyEmail(updated.admin_notify_email || "");
       setEditingSmtpPassword(false);
       setEditingTextbeltKey(false);
       setEditingResendApiKey(false);
@@ -222,6 +226,26 @@ export default function AdminConfigPage() {
             )}
             <span className="text-base05">{"]"}</span>
           </span>
+        </div>
+
+        {/* Account-request notifications row */}
+        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base03">
+          <span className="text-base04" style={{ width: "8ch" }}>requests:</span>
+
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"notify email: "}</span>
+            <span className="text-base05">{"["}</span>
+            <input
+              type="text"
+              value={notifyEmail}
+              onChange={(e) => setNotifyEmail(e.target.value)}
+              placeholder="----"
+              style={{ width: "24ch" }}
+              className="bg-transparent text-base05 placeholder-base04 outline-none font-mono min-w-0 px-0"
+            />
+            <span className="text-base05">{"]"}</span>
+          </span>
+          <span className="text-base03">falls back to resend reply-to</span>
         </div>
 
         {/* TextBelt row */}

@@ -12,6 +12,7 @@ class NotificationCredentialsUpdate(BaseModel):
     resend_api_key: str | None = None
     resend_from_address: str | None = None
     resend_reply_to: str | None = None
+    admin_notify_email: str | None = None
 
 
 class NotificationCredentialsRead(BaseModel):
@@ -23,4 +24,5 @@ class NotificationCredentialsRead(BaseModel):
     resend_api_key_set: bool
     resend_from_address: str | None
     resend_reply_to: str | None
+    admin_notify_email: str | None
     updated_at: datetime

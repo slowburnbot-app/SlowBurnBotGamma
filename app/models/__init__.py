@@ -11,6 +11,7 @@ from app.models.ignore_handle import IgnoreHandle
 from app.models.user_config import UserConfig
 from app.models.system_config import SystemConfig
 from app.models.invite_code import InviteCode
+from app.models.account_request import AccountRequest
 from app.models.client_heartbeat import ClientHeartbeat
 from app.models.processed_stripe_event import ProcessedStripeEvent
 from app.models.access_token import AccessToken
@@ -29,6 +30,7 @@ __all__ = [
     "UserConfig",
     "SystemConfig",
     "InviteCode",
+    "AccountRequest",
     "ClientHeartbeat",
     "ProcessedStripeEvent",
     "AccessToken",

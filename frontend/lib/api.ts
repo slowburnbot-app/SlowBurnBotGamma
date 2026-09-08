@@ -175,6 +175,7 @@ export async function adminUpdateNotificationCredentials(data: {
   resend_api_key?: string;
   resend_from_address?: string;
   resend_reply_to?: string;
+  admin_notify_email?: string;
 }) {
   return request<NotificationCredentials>("/admin/notification-credentials", {
     method: "PUT",
@@ -403,6 +404,70 @@ export async function adminDeleteInvite(inviteId: string) {
   return request<void>(`/admin/invites/${inviteId}`, { method: "DELETE" });
 }
 
+// Account requests (public landing-page submissions)
+export type AccountRequestStatus = "new" | "contacted" | "invited" | "declined";
+
+export interface AccountRequest {
+  id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  industry: string | null;
+  account_count: number | null;
+  instagram_handles: string | null;
+  notes: string | null;
+  status: AccountRequestStatus;
+  created_at: string;
+  handled_at: string | null;
+}
+
+// Public — deliberately not via request(): that attaches a bearer token and
+// its 401 handler hard-redirects to /login, neither of which belongs on the
+// landing page. Goes to the dedicated rate-limited route, not the catch-all.
+export async function submitAccountRequest(data: {
+  name: string;
+  email: string;
+  company?: string;
+  industry?: string;
+  account_count?: number;
+  instagram_handles?: string;
+  notes?: string;
+  website?: string;
+}) {
+  const res = await fetch(`${API_URL}/account-request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = body?.detail;
+    // FastAPI validation errors arrive as a list; surface the first one plainly.
+    if (Array.isArray(detail)) {
+      const first = detail[0];
+      const field = Array.isArray(first?.loc) ? first.loc[first.loc.length - 1] : "";
+      throw new Error(field ? `${field}: ${first.msg}` : first?.msg ?? "invalid request.");
+    }
+    throw new Error(typeof detail === "string" ? detail : `request failed: ${res.status}`);
+  }
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
+export async function adminListAccountRequests() {
+  return request<AccountRequest[]>("/admin/account-requests");
+}
+
+export async function adminSetAccountRequestStatus(requestId: string, status: AccountRequestStatus) {
+  return request<AccountRequest>(`/admin/account-requests/${requestId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function adminDeleteAccountRequest(requestId: string) {
+  return request<void>(`/admin/account-requests/${requestId}`, { method: "DELETE" });
+}
+
 // Types
 export interface User {
   id: string;
@@ -538,6 +603,7 @@ export interface NotificationCredentials {
   resend_api_key_set: boolean;
   resend_from_address: string | null;
   resend_reply_to: string | null;
+  admin_notify_email: string | null;
   updated_at: string;
 }
 
