@@ -318,27 +318,30 @@ export default function AccountDetailPage() {
         {/* Action limits — read-only: Instagram throttling detected by the bot.
             Not part of the form's save semantics (no inputs). */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">action limits</div>
+          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">account status and limits</div>
           <div className="px-4 py-3 space-y-2">
-            <div className="grid gap-x-3 gap-y-1" style={{ gridTemplateColumns: "9ch auto" }}>
-              {(["like", "follow", "unfollow"] as const).map((verb) => {
-                const active = account.action_limits?.find((l) => l.action === verb);
-                return (
-                  <span key={verb} className="contents">
-                    <span className="text-base04">{verb}:</span>
-                    {active ? (
-                      <span>
-                        <span className="text-base05">{"["}</span>
-                        <span className="text-status-warning">{`limited until ${fmtLimitUntil(active.until)}`}</span>
-                        <span className="text-base05">{"]"}</span>
-                        <span className="text-base04">{` strike ${active.strike} — ${active.reason || active.tier}`}</span>
-                      </span>
-                    ) : (
-                      <Bracket className="text-base04">------</Bracket>
-                    )}
-                  </span>
-                );
-              })}
+            <div className="grid gap-x-3 gap-y-1" style={{ gridTemplateColumns: "12ch auto" }}>
+              <span className="text-base04">actions:</span>
+              <span className="flex items-center gap-x-5 gap-y-1 flex-wrap">
+                {(["like", "follow", "unfollow"] as const).map((verb) => {
+                  const active = account.action_limits?.find((l) => l.action === verb);
+                  return (
+                    <span key={verb} className="inline-flex items-center gap-0">
+                      <span className="text-base04">{`${verb}: `}</span>
+                      {active ? (
+                        <span>
+                          <span className="text-base05">{"["}</span>
+                          <span className="text-status-warning">{`limited until ${fmtLimitUntil(active.until)}`}</span>
+                          <span className="text-base05">{"]"}</span>
+                          <span className="text-base04">{` strike ${active.strike} — ${active.reason || active.tier}`}</span>
+                        </span>
+                      ) : (
+                        <Bracket className="text-status-ok">no limits</Bracket>
+                      )}
+                    </span>
+                  );
+                })}
+              </span>
               <span className="text-base04">status page:</span>
               <span>
                 {account.status_page_checked_at ? (
@@ -470,9 +473,9 @@ export default function AccountDetailPage() {
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions: the table carries its own header row, so the title sits above the box */}
+        <div className="text-base04">session actions</div>
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">session actions</div>
           <div className="overflow-x-auto">
           <table className="w-full font-mono">
             <thead>
@@ -565,54 +568,6 @@ export default function AccountDetailPage() {
         {/* Follow Settings */}
         <div className={sectionCls}>
           <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">follow settings</div>
-          <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base02">
-
-            <span className="inline-flex items-center gap-0">
-              <span className="text-base04">{"unfollow after: "}</span>
-              <span className="text-base05">{"["}</span>
-              <NumberInput
-                value={settings.unfollow_days}
-                onChange={(n) => setSettings((s) => ({ ...s, unfollow_days: n || 30 }))}
-                placeholder="30"
-              />
-              <span className="text-base05">{"]"}</span>
-              <span className="text-base04">{"\u00A0days"}</span>
-            </span>
-
-          </div>
-          <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base02">
-            <span className="text-base04">follow filters (0 = off):</span>
-            <span className="inline-flex items-center gap-0">
-              <span className="text-base04">{"max followers: "}</span>
-              <span className="text-base05">{"["}</span>
-              <NumberInput
-                value={settings.max_followers}
-                onChange={(n) => setSettings((s) => ({ ...s, max_followers: n }))}
-                placeholder="0" max={9999999} maxLength={7}
-              />
-              <span className="text-base05">{"]"}</span>
-            </span>
-            <span className="inline-flex items-center gap-0">
-              <span className="text-base04">{"min following/followers %: "}</span>
-              <span className="text-base05">{"["}</span>
-              <NumberInput
-                value={settings.min_follow_ratio_pct}
-                onChange={(n) => setSettings((s) => ({ ...s, min_follow_ratio_pct: n }))}
-                placeholder="0" max={999} maxLength={3}
-              />
-              <span className="text-base05">{"]"}</span>
-            </span>
-            <span className="inline-flex items-center gap-0">
-              <span className="text-base04">{"min posts: "}</span>
-              <span className="text-base05">{"["}</span>
-              <NumberInput
-                value={settings.min_posts}
-                onChange={(n) => setSettings((s) => ({ ...s, min_posts: n }))}
-                placeholder="0" max={999} maxLength={3}
-              />
-              <span className="text-base05">{"]"}</span>
-            </span>
-          </div>
           <div className="px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-4">
             <div>
               {/* account group: exactly one of the two sections is active; the other dims */}

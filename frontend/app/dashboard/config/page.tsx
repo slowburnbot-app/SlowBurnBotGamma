@@ -49,8 +49,14 @@ export default function ConfigPage() {
   const [notifyEmail, setNotifyEmail] = useState("");
   const [notifyPhone, setNotifyPhone] = useState("");
 
-  // Ignore list
+  // Follow accounts settings
   const [skipPrivate, setSkipPrivate] = useState(false);
+  const [unfollowDays, setUnfollowDays] = useState(30);
+  const [maxFollowers, setMaxFollowers] = useState(5000);
+  const [minFollowRatioPct, setMinFollowRatioPct] = useState(50);
+  const [minPosts, setMinPosts] = useState(1);
+
+  // Ignore list
   const [ignoreHandles, setIgnoreHandles] = useState("");
 
   useEffect(() => {
@@ -69,6 +75,10 @@ export default function ConfigPage() {
         setLoginNotifyEmail(c.login_notify_email ?? "");
         setLoginNotifyPhone(c.login_notify_phone ?? "");
         setSkipPrivate(c.skip_private);
+        setUnfollowDays(c.unfollow_days);
+        setMaxFollowers(c.max_followers);
+        setMinFollowRatioPct(c.min_follow_ratio_pct);
+        setMinPosts(c.min_posts);
         setNotifyEmail(c.notify_email ?? "");
         setNotifyPhone(c.notify_phone ?? "");
       })
@@ -95,6 +105,10 @@ export default function ConfigPage() {
         login_notify_email: loginNotifyEmail || null,
         login_notify_phone: loginNotifyPhone || null,
         skip_private: skipPrivate,
+        unfollow_days: unfollowDays,
+        max_followers: maxFollowers,
+        min_follow_ratio_pct: minFollowRatioPct,
+        min_posts: minPosts,
         notify_email: notifyEmail || null,
         notify_phone: notifyPhone || null,
       });
@@ -119,11 +133,18 @@ export default function ConfigPage() {
       <h1 className="font-semibold text-base05">Config</h1>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">session settings</div>
+        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">like posts settings</div>
 
         <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
           <BracketCheckbox label="Like Suggested" checked={likeSuggested} onChange={setLikeSuggested} />
           <BracketCheckbox label="Like Sponsored" checked={likeSponsored} onChange={setLikeSponsored} />
+        </div>
+      </div>
+
+      <div className={sectionCls}>
+        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">account and login settings</div>
+
+        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
           <BracketCheckbox label="Skip Login Check" checked={skipLoginCheck} onChange={setSkipLoginCheck} />
           <BracketCheckbox label="Debug Logging" checked={botDebug} onChange={setBotDebug} />
 
@@ -136,6 +157,60 @@ export default function ConfigPage() {
               placeholder="3"
               max={10}
               maxLength={2}
+            />
+            <span className="text-base05">{"]"}</span>
+          </span>
+        </div>
+      </div>
+
+      <div className={sectionCls}>
+        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">follow accounts settings</div>
+
+        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base02">
+          <BracketCheckbox label="Skip Private Accounts" checked={skipPrivate} onChange={setSkipPrivate} />
+
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"unfollow after: "}</span>
+            <span className="text-base05">{"["}</span>
+            <NumberInput
+              value={unfollowDays}
+              onChange={(n) => setUnfollowDays(n || 30)}
+              placeholder="30"
+            />
+            <span className="text-base05">{"]"}</span>
+            <span className="text-base04">{"\u00A0days"}</span>
+          </span>
+        </div>
+
+        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
+          <span className="text-base04">follow filters (0 = off):</span>
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"max followers: "}</span>
+            <span className="text-base05">{"["}</span>
+            <NumberInput
+              value={maxFollowers}
+              onChange={setMaxFollowers}
+              placeholder="0" max={9999999} maxLength={7}
+            />
+            <span className="text-base05">{"]"}</span>
+          </span>
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"min following/followers %: "}</span>
+            <span className="text-base05">{"["}</span>
+            <NumberInput
+              value={minFollowRatioPct}
+              onChange={setMinFollowRatioPct}
+              placeholder="0" max={999} maxLength={3}
+            />
+            <span className="text-base05">{"]"}</span>
+          </span>
+          <span className="inline-flex items-center gap-0">
+            <span className="text-base04">{"min posts: "}</span>
+            <span className="text-base05">{"["}</span>
+            <NumberInput
+              value={minPosts}
+              onChange={setMinPosts}
+              placeholder="0" max={999} maxLength={3}
             />
             <span className="text-base05">{"]"}</span>
           </span>
@@ -171,11 +246,7 @@ export default function ConfigPage() {
       <div className={sectionCls}>
         <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">universal ignore</div>
 
-        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
-          <BracketCheckbox label="Skip Private Accounts" checked={skipPrivate} onChange={setSkipPrivate} />
-        </div>
-
-        <div className="px-4 py-3 border-t border-base02">
+        <div className="px-4 py-3">
           <div className="text-base04 mb-1">skip/ignore account list</div>
           <textarea
             value={ignoreHandles}

@@ -40,14 +40,8 @@ class AccountSettings(Base):
     actions: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     actions_random_order: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # Unfollow / follow sources
-    unfollow_days: Mapped[int] = mapped_column(Integer, default=30)
-    # Follow candidate filters read off the profile hover card before a follow (0 = rule off):
-    # skip accounts with more than max_followers, require following/followers >=
-    # min_follow_ratio_pct percent, require at least min_posts posts.
-    max_followers: Mapped[int] = mapped_column(Integer, default=5000)
-    min_follow_ratio_pct: Mapped[int] = mapped_column(Integer, default=50)
-    min_posts: Mapped[int] = mapped_column(Integer, default=1)
+    # Follow sources (unfollow_days and the hover-card follow filters are
+    # user-wide: see UserConfig)
     list_tab: Mapped[str | None] = mapped_column(String(150), nullable=True)
     account_group: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # Where "account list …" (incl. "account list [likers]") take their targets from:

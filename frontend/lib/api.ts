@@ -570,10 +570,6 @@ export interface AccountSettings {
   max_runs_random_per_day: number;
   actions: ActionBlock[] | null;
   actions_random_order: boolean;
-  unfollow_days: number;
-  max_followers: number;
-  min_follow_ratio_pct: number;
-  min_posts: number;
   list_tab: string | null;
   account_group: string | null;
   account_group_mode: string;
@@ -615,6 +611,10 @@ export interface UserConfig {
   skip_login_check: boolean;
   login_tries: number;
   skip_private: boolean;
+  unfollow_days: number;
+  max_followers: number;
+  min_follow_ratio_pct: number;
+  min_posts: number;
   notices_type: string;
   notices_session: boolean;
   notices_login: boolean;

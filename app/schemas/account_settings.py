@@ -22,10 +22,6 @@ class AccountSettingsUpdate(BaseModel):
     max_runs_random_per_day: int = 0
     actions: list[ActionBlock] | None = None
     actions_random_order: bool = False
-    unfollow_days: int = 30
-    max_followers: int = 5000
-    min_follow_ratio_pct: int = 50
-    min_posts: int = 1
     list_tab: str | None = None
     account_group: str | None = None
     account_group_mode: str = "manual"
@@ -47,10 +43,6 @@ class AccountSettingsRead(BaseModel):
     max_runs_random_per_day: int
     actions: list | None
     actions_random_order: bool
-    unfollow_days: int
-    max_followers: int = 5000
-    min_follow_ratio_pct: int = 50
-    min_posts: int = 1
     list_tab: str | None
     account_group: str | None
     account_group_mode: str = "manual"

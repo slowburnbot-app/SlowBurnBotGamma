@@ -10,6 +10,10 @@ class UserConfigUpdate(BaseModel):
     skip_login_check: bool | None = None
     login_tries: int | None = None
     skip_private: bool | None = None
+    unfollow_days: int | None = None
+    max_followers: int | None = None
+    min_follow_ratio_pct: int | None = None
+    min_posts: int | None = None
     notices_type: str = "none"
     notices_session: bool = True
     notices_login: bool = True
@@ -31,6 +35,10 @@ class UserConfigRead(BaseModel):
     skip_login_check: bool
     login_tries: int
     skip_private: bool
+    unfollow_days: int = 30
+    max_followers: int = 5000
+    min_follow_ratio_pct: int = 50
+    min_posts: int = 1
     notices_type: str
     notices_session: bool
     notices_login: bool

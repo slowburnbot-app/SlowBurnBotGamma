@@ -99,6 +99,15 @@ def accountSession(account, account_id, idx, threads_active, stop_flag, apiClien
             pass
 
 
+def _user_unfollow_days(apiClient):
+    """The user-wide unfollow window from /bot/config (cached by the client); 30 if unknown."""
+    try:
+        cfg = apiClient.get_user_config() or {}
+    except Exception:
+        cfg = {}
+    return int(cfg.get("unfollow_days", 30) or 30)
+
+
 def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, apiClient, permanent_idx, _print):
     global drivers
 
@@ -121,8 +130,8 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
     # Parse actions
     action_slots = _parse_actions(settings)
 
-    # Other settings
-    unfollow_days = int(settings.get("unfollow_days", 30) or 30)
+    # Other settings (unfollow_days is user-wide: /dashboard/config)
+    unfollow_days = _user_unfollow_days(apiClient)
     action_topics = settings.get("topics") or ""
 
     # Account group / target accounts for the follow-group actions
@@ -189,7 +198,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                     scheduleEnd = settings.get("schedule_end") or ""
                     scheduleMax = int(settings.get("max_runs_per_day", 0) or 0)
                     action_slots = _parse_actions(settings)
-                    unfollow_days = int(settings.get("unfollow_days", 30) or 30)
+                    unfollow_days = _user_unfollow_days(apiClient)
                     action_topics = settings.get("topics") or ""
                     account_list_tab = settings.get("account_group") or ""
                     account_group_mode = (settings.get("account_group_mode") or "manual").strip().lower()

@@ -25,6 +25,7 @@ from app.models.follow_target import FollowTarget
 from app.models.session_log import SessionLog
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.models.user_config import UserConfig
 from app.schemas.account import AccountCreate, AccountRead, AccountUpdate
 from app.schemas.account_settings import AccountSettingsRead, AccountSettingsUpdate
 from app.schemas.action_limit import ActionLimitRead, ActiveActionLimit
@@ -562,10 +563,11 @@ async def get_account_stats(
         )
     )
 
-    settings_row = await session.scalar(
-        select(AccountSettings).where(AccountSettings.account_id == account_id)
+    # unfollow_days is user-wide (UserConfig), not per account.
+    unfollow_days = await session.scalar(
+        select(UserConfig.unfollow_days).where(UserConfig.user_id == user.id)
     )
-    unfollow_days = (settings_row.unfollow_days if settings_row else 30) or 30
+    unfollow_days = unfollow_days or 30
     unfollow_cutoff = datetime.now(timezone.utc) - timedelta(days=unfollow_days)
     unfollow_ready = await session.scalar(
         select(func.count()).where(

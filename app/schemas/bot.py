@@ -83,6 +83,10 @@ class BotUserConfigRead(BaseModel):
     skip_login_check: bool = False
     login_tries: int = 3
     skip_private: bool = False
+    unfollow_days: int = 30
+    max_followers: int = 5000
+    min_follow_ratio_pct: int = 50
+    min_posts: int = 1
     notices_type: str
     notices_session: bool
     notify_email: str | None = None
