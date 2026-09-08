@@ -8,12 +8,12 @@ import { Bracket } from "@/lib/bracket";
 import { LoginForm } from "@/lib/login-form";
 
 const HIGHLIGHTS: [string, string][] = [
-  ["slow burn pacing", "randomized delays and idle browsing between actions — it looks like a person scrolling, not a script firing."],
-  ["one browser per account", "every account gets its own isolated profile: separate cookies, session, and fingerprint."],
-  ["runs on your schedule", "pick the days, the hours, and a daily cap. it works while you don't."],
-  ["mix your actions", "chain likes, follows, and unfollows from feeds, topics, suggestions, or any account's followers."],
-  ["see everything", "live client status, session-by-session logs, follow-back rates, and a full csv export."],
-  ["built-in guardrails", "skips private and sponsored accounts, honors a global ignore list, and backs off when instagram pushes back."],
+  ["steady pacing", "consistent, measured activity that builds a following over time instead of chasing spikes."],
+  ["every profile, its own space", "each profile is managed separately, with its own settings, schedule, and history."],
+  ["on your schedule", "choose the days, the hours, and a daily limit that fit how you want to show up."],
+  ["reach the right people", "connect with audiences that matter to you: people in your niche, fans of similar profiles, and communities around your topics."],
+  ["see everything", "activity history, growth trends, and a full export, so you always know what's been done and what it's doing for you."],
+  ["built-in good judgment", "sensible limits and a do-not-touch list keep your promotion tasteful and your reputation intact."],
 ];
 
 const inputCls =
@@ -125,13 +125,13 @@ function RequestForm() {
             max={500}
             value={accountCount}
             onChange={(e) => setAccountCount(e.target.value.replace(/\D/g, ""))}
-            placeholder="how many instagram accounts"
+            placeholder="how many profiles"
             className={inputCls}
           />
         </div>
       </div>
       <div className="space-y-1">
-        <div className="text-base04">instagram handles</div>
+        <div className="text-base04">profile handles or links</div>
         <textarea
           value={handles}
           onChange={(e) => setHandles(e.target.value)}
@@ -201,27 +201,24 @@ export function Landing() {
         <main className="px-3 sm:px-6 py-6 space-y-8">
           <section className="space-y-3 max-w-3xl">
             <h1 className="text-2xl sm:text-3xl text-base05 leading-snug">
-              grow your instagram presence —{" "}
-              <span className="text-base0e">slowly, safely, and on autopilot.</span>
+              grow your social presence —{" "}
+              <span className="text-base0e">steadily, consistently, and without the daily grind.</span>
             </h1>
             <p className="text-base04 leading-relaxed">
-              slowburnbot is a paced, safety-first instagram automation platform for people who
-              manage more than one account. instead of hammering instagram with bursts of activity
-              that get accounts flagged, it mimics natural human behavior — randomized timing,
-              scheduled active hours, daily caps, and chained activities that look like a real
-              person scrolling. configure it once in a clean web dashboard; it runs quietly in the
-              background and reports back what it did.
+              slowburnbot helps small businesses, agencies, and creators promote their social
+              profiles at a steady, sustainable pace. set your goals and your schedule once in a
+              clean web dashboard, then check back whenever you like to see how things are going.
             </p>
             <p className="text-base04 leading-relaxed">
-              built for small businesses, agencies, and creators juggling several accounts who
-              want consistent organic growth without the burnout — or the bans — of doing it by hand.
+              built for people juggling more than one profile who want consistent, organic growth
+              without burning out — or burning through their audience&apos;s patience.
             </p>
           </section>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
             <section className="lg:col-span-3 border border-base03">
               <div className="border-b border-base03 px-4 py-2 bg-base01">
-                <span className="text-base05">what it does</span>
+                <span className="text-base05">what you get</span>
               </div>
               <ul className="divide-y divide-base03">
                 {HIGHLIGHTS.map(([title, body]) => (

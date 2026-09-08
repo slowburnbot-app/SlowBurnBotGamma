@@ -4,9 +4,9 @@ import { Landing } from "./landing";
 // Server component so this route can carry its own metadata; the page body
 // is a client component because it reads auth state and hosts the forms.
 export const metadata: Metadata = {
-  title: "SlowBurnBot — slow, safe Instagram growth on autopilot",
+  title: "SlowBurnBot — steady, sustainable growth for your social profiles",
   description:
-    "Paced, safety-first Instagram automation for people who manage more than one account. Human-like timing, scheduled hours, daily caps, and a dashboard that shows you everything.",
+    "SlowBurnBot helps small businesses, agencies, and creators promote their social profiles at a steady, sustainable pace. Set it up once in a clean dashboard and watch your presence grow.",
 };
 
 export default function Home() {
