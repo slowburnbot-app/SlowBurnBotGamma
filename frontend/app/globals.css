@@ -14,6 +14,7 @@
   /* Semantic aliases — pointers into the base24 layer. Existing classes like
      text-status-ok and selectors using var(--background) keep working. */
   --background:       var(--base00);
+  --page-background:  var(--base10);
   --foreground:       var(--base05);
   --status-ok:            var(--base0b);
   --status-bad:           var(--base12);
@@ -67,7 +68,10 @@ html {
 }
 
 body {
-  background: var(--background);
+  /* Surface layering, darkest to lightest: page (base10) → centered
+     content container (base00) → panel/table body (base01) → section
+     header strips and row hover (base02). */
+  background: var(--page-background);
   color: var(--foreground);
   font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
 }

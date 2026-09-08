@@ -80,8 +80,8 @@ export default function AdminInvitesPage() {
       <h1 className="font-semibold text-base05">admin — invites</h1>
       {msg && <p className="text-status-ok">{msg}</p>}
 
-      <div className="border border-base03">
-        <div className="border-b border-base03 px-4 py-2 bg-base01">
+      <div className="border border-base03 bg-base01">
+        <div className="border-b border-base03 px-4 py-2 bg-base02">
           <span className="text-base05">generate invite</span>
         </div>
         <form onSubmit={handleGenerate} className="px-4 py-3 space-y-3">
@@ -145,8 +145,8 @@ export default function AdminInvitesPage() {
         </form>
       </div>
 
-      <div className="border border-base03">
-        <div className="border-b border-base03 px-4 py-2 bg-base01">
+      <div className="border border-base03 bg-base01">
+        <div className="border-b border-base03 px-4 py-2 bg-base02">
           <span className="text-base05">invite codes</span>
           <span className="text-base04 ml-2">[{invites.length}]</span>
         </div>
@@ -156,7 +156,7 @@ export default function AdminInvitesPage() {
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <th className="px-4 py-2 font-normal">code</th>
                 <th className="px-4 py-2 font-normal">email</th>
                 <th className="px-4 py-2 font-normal">tier</th>

@@ -92,7 +92,7 @@ function normalizeList(raw: string | null | undefined, kind: "accounts" | "topic
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
-const sectionCls = "border border-base03";
+const sectionCls = "border border-base03 bg-base01";
 
 // ── component ─────────────────────────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ export default function AccountDetailPage() {
 
         {/* Configuration */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">configuration</div>
+          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">configuration</div>
           <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
 
             <BracketCheckbox
@@ -318,7 +318,7 @@ export default function AccountDetailPage() {
         {/* Action limits — read-only: Instagram throttling detected by the bot.
             Not part of the form's save semantics (no inputs). */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">action limits</div>
+          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">action limits</div>
           <div className="px-4 py-3 space-y-2">
             <div className="grid gap-x-3 gap-y-1" style={{ gridTemplateColumns: "9ch auto" }}>
               {(["like", "follow", "unfollow"] as const).map((verb) => {
@@ -372,7 +372,7 @@ export default function AccountDetailPage() {
 
         {/* Schedule */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">schedule</div>
+          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">schedule</div>
           <div className="px-4 py-3 space-y-2">
 
             <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
@@ -472,11 +472,11 @@ export default function AccountDetailPage() {
 
         {/* Actions */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">session actions</div>
+          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">session actions</div>
           <div className="overflow-x-auto">
           <table className="w-full font-mono">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <th className="px-4 py-2 font-normal w-10"></th>
                 <th className="px-4 py-2 font-normal w-10">on</th>
                 <th className="px-4 py-2 font-normal">type</th>
@@ -564,7 +564,7 @@ export default function AccountDetailPage() {
 
         {/* Follow Settings */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">follow settings</div>
+          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">follow settings</div>
           <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base03">
 
             <span className="inline-flex items-center gap-0">

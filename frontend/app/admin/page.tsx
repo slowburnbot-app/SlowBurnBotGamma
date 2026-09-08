@@ -96,14 +96,14 @@ export default function AdminPage() {
     <div className="space-y-4 font-mono">
       <h1 className="font-semibold text-base05">admin — users</h1>
       {msg && <p className="text-status-ok">{msg}</p>}
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {users.length === 0 ? (
           <p className="px-4 py-6 text-base04">no users found.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <th className="px-4 py-2 font-normal">email</th>
                 <th className="px-4 py-2 font-normal">tier</th>
                 <th className="px-4 py-2 font-normal">status</th>

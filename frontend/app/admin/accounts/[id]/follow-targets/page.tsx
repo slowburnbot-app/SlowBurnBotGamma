@@ -54,7 +54,7 @@ export default function FollowTargetsPage() {
         </span>
       </div>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {loading ? (
           <p className="px-4 py-6 text-base04">loading…</p>
         ) : items.length === 0 ? (
@@ -63,7 +63,7 @@ export default function FollowTargetsPage() {
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <th className="px-4 py-2 font-normal">handle</th>
                 <th className="px-4 py-2 font-normal">source</th>
                 <th className="px-4 py-2 font-normal">status</th>

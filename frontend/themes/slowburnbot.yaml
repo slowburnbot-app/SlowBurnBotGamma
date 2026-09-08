@@ -7,9 +7,9 @@ author: "SlowBurnBot"
 variant: "dark"
 palette:
   # Monotones
-  base00: "141413"  # Default Background        — page bg
-  base01: "1a1918"  # Lighter Background        — section headers
-  base02: "1f1e1d"  # Selection Background      — select option bg, panels
+  base00: "141413"  # Default Background        — centered content container
+  base01: "1c1b1a"  # Lighter Background        — panel / table body
+  base02: "242322"  # Selection Background      — section headers, row hover, select option bg
   base03: "3d3d3a"  # Comments / Line Highlight — borders, dividers
   base04: "9a968b"  # Dark Foreground           — secondary / muted text
   base05: "f4f3ee"  # Default Foreground        — primary text
@@ -25,8 +25,8 @@ palette:
   base0E: "d97757"  # Purple                    — links, CTAs, focus rings, accent
   base0F: "a8765a"  # Brown                     — (reserved)
   # Extensions
-  base10: "0d0c0c"  # Darker Background         — (reserved)
-  base11: "2a2927"  # Brighter Background       — dropdown row hover
+  base10: "0d0c0c"  # Darker Background         — page bg (behind the container)
+  base11: "2e2d2b"  # Brighter Background       — dropdown row hover, small buttons
   # Brights
   base12: "cf3b0a"  # Bright Red                — error / destructive
   base13: "f1d49a"  # Bright Yellow             — warning-control hover

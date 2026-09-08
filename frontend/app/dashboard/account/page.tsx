@@ -64,10 +64,10 @@ function ThemeSelector() {
           </button>
         )}
       </div>
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         <table className="w-full">
           <thead>
-            <tr className="text-left text-base04 border-b border-base03 bg-base01">
+            <tr className="text-left text-base04 border-b border-base03 bg-base02">
               <th className="px-[6px] py-2 font-normal">name</th>
               <th className="px-[6px] py-2 font-normal">preview</th>
               <th className="px-[6px] py-2 font-normal text-right"></th>
@@ -175,8 +175,8 @@ export default function AccountPage() {
         <h2 className="font-semibold text-base05">plan</h2>
         {info ? (
           <>
-            <div className="border border-base03">
-              <div className="border-b border-base03 px-[6px] py-2 bg-base01 text-base04 flex items-center justify-between">
+            <div className="border border-base03 bg-base01">
+              <div className="border-b border-base03 px-[6px] py-2 bg-base02 text-base04 flex items-center justify-between">
                 <span>current plan</span>
                 {hasBillableSubscription && (
                   <button onClick={handleManageBilling} disabled={busy !== null} className="group cursor-pointer transition-colors disabled:opacity-50">
@@ -205,10 +205,10 @@ export default function AccountPage() {
             {msg && <p className="text-status-bad text-sm">{msg}</p>}
 
             <h2 className="font-semibold text-base05">available plans</h2>
-            <div className="border border-base03">
+            <div className="border border-base03 bg-base01">
               <table className="w-full">
                 <thead>
-                  <tr className="text-left text-base04 border-b border-base03 bg-base01">
+                  <tr className="text-left text-base04 border-b border-base03 bg-base02">
                     <th className="px-[6px] py-2 font-normal">tier</th>
                     <th className="px-[6px] py-2 font-normal">price</th>
                     <th className="px-[6px] py-2 font-normal">accounts</th>

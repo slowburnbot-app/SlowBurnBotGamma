@@ -113,7 +113,7 @@ export default function AccountLogPage() {
         <span className="text-base04 ml-auto">[{total.toLocaleString()} entries]</span>
       </div>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {loading ? (
           <p className="px-4 py-6 text-base04">loading...</p>
         ) : items.length === 0 ? (
@@ -122,7 +122,7 @@ export default function AccountLogPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base01">
+                <tr className="text-left text-base04 border-b border-base03 bg-base02">
                   <SortTh label="date" field="date" />
                   <SortTh label="run" field="run" />
                   <SortTh label="start" field="start" />

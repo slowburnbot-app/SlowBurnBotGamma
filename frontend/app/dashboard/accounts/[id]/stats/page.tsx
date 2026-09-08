@@ -114,11 +114,11 @@ export default function AccountStatsPage() {
         <span className="text-base05">{account.name}</span>
       </div>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-base04 border-b border-base03 bg-base01">
+            <tr className="text-left text-base04 border-b border-base03 bg-base02">
               <SortTh label="source" field="source" />
               <SortTh label="Complete" field="complete" />
               <SortTh label="Followed Back" field="followed_back" />
@@ -158,7 +158,7 @@ export default function AccountStatsPage() {
           </tbody>
           {items.length > 0 && (
             <tfoot>
-              <tr className="text-base04 border-t border-base03 bg-base01">
+              <tr className="text-base04 border-t border-base03 bg-base02">
                 <td className="px-4 py-2 text-base05">total</td>
                 <td className="px-4 py-2">{totals.complete.toLocaleString()}</td>
                 <td className="px-4 py-2">{totals.followed_back.toLocaleString()}</td>

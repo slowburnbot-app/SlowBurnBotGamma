@@ -252,14 +252,14 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {accounts.length === 0 ? (
           <p className="px-4 py-6 font-mono text-base04">No accounts yet.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full font-mono">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <SortTh label="On" field="enabled" />
                 <SortTh label="Account" field="name" />
                 {tab === "settings" && (

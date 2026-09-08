@@ -268,7 +268,7 @@ export default function DashboardPage() {
         Clients <span className="text-base0a font-normal">[{String(subInfo?.current_clients ?? 0).padStart(2, "0")}/{subInfo?.max_clients ? String(subInfo.max_clients).padStart(2, "0") : "--"}]</span>
       </h2>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {clientStatus.length === 0 ? (
           clientStatusError ? (
             <p className="px-4 py-6 text-status-bad">client status unavailable — could not reach the server.</p>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <th className="px-2.5 py-2 font-normal">Client</th>
                 <th className="px-2.5 py-2 font-normal">Name</th>
                 <th className="px-2.5 py-2 font-normal">OS</th>
@@ -358,14 +358,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {accounts.length === 0 ? (
           <p className="px-4 py-6 font-mono text-base04">No accounts yet.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full font-mono">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <SortTh label="On" field="enabled" />
                 <SortTh label="Account" field="name" />
                 {tab === "settings" && (
@@ -543,14 +543,14 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {recentLog.length === 0 ? (
           <div className="px-4 py-6 text-base04">no session log entries yet.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base01">
+                <tr className="text-left text-base04 border-b border-base03 bg-base02">
                   <th className="px-[6px] py-2 font-normal whitespace-nowrap">account</th>
                   <th className="px-[6px] py-2 font-normal whitespace-nowrap">date</th>
                   <th className="px-[6px] py-2 font-normal whitespace-nowrap">run</th>

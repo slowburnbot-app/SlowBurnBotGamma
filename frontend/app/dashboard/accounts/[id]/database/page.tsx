@@ -99,7 +99,7 @@ export default function AccountDatabasePage() {
         <span className="text-base04 ml-auto">[{total.toLocaleString()} records]</span>
       </div>
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {loading ? (
           <p className="px-4 py-6 text-base04">loading…</p>
         ) : items.length === 0 ? (
@@ -108,7 +108,7 @@ export default function AccountDatabasePage() {
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <SortTh label="handle" field="handle" />
                 <SortTh label="source" field="source" />
                 <SortTh label="status" field="status" />

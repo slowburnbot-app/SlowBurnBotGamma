@@ -190,7 +190,7 @@ export function Landing() {
 
   return (
     <div className="min-h-screen flex flex-col font-mono">
-      <div className="flex-1 max-w-5xl mx-auto w-full sm:border-x border-base03">
+      <div className="flex-1 max-w-5xl mx-auto w-full bg-base00 sm:border-x border-base03">
         <header className="px-3 sm:px-6 py-3 flex items-center justify-between">
           <span className="font-semibold text-base0e">SlowBurnBot</span>
           <a href="#sign-in" className="group transition-colors">
@@ -216,8 +216,8 @@ export function Landing() {
           </section>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-            <section className="lg:col-span-3 border border-base03">
-              <div className="border-b border-base03 px-4 py-2 bg-base01">
+            <section className="lg:col-span-3 border border-base03 bg-base01">
+              <div className="border-b border-base03 px-4 py-2 bg-base02">
                 <span className="text-base05">what you get</span>
               </div>
               <ul className="divide-y divide-base03">
@@ -232,8 +232,8 @@ export function Landing() {
               </ul>
             </section>
 
-            <section id="sign-in" className="lg:col-span-2 border border-base03 scroll-mt-4">
-              <div className="border-b border-base03 px-4 py-2 bg-base01">
+            <section id="sign-in" className="lg:col-span-2 border border-base03 bg-base01 scroll-mt-4">
+              <div className="border-b border-base03 px-4 py-2 bg-base02">
                 <span className="text-base05">sign in</span>
               </div>
               <div className="px-4 py-4">
@@ -242,8 +242,8 @@ export function Landing() {
             </section>
           </div>
 
-          <section id="request" className="border border-base03 relative scroll-mt-4">
-            <div className="border-b border-base03 px-4 py-2 bg-base01 flex items-center justify-between">
+          <section id="request" className="border border-base03 bg-base01 relative scroll-mt-4">
+            <div className="border-b border-base03 px-4 py-2 bg-base02 flex items-center justify-between">
               <span className="text-base05">request an account</span>
               <span className="text-base04 text-sm">tell us a bit about what you run</span>
             </div>

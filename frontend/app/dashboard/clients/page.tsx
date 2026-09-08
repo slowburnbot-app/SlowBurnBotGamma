@@ -50,7 +50,7 @@ function platformLabel(system_type: string): string {
   return system_type === "linux" ? "linux" : system_type === "macos" ? "macos" : "windows";
 }
 
-const sectionCls = "border border-base03";
+const sectionCls = "border border-base03 bg-base01";
 
 function statusColor(status: string): string {
   if (status === "activated") return "text-status-ok";
@@ -89,7 +89,7 @@ function BuildForm({
   const canSubmit = !submitting;
 
   return (
-    <div className="px-4 py-3 bg-base01 border-t border-base03">
+    <div className="px-4 py-3 bg-base02 border-t border-base03">
       <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
         <BracketInput label="client name" value={cfg.client_name} onChange={(v) => set("client_name", v.slice(0, 15))} width="15ch" placeholder="my laptop" />
         {(Object.keys(PLATFORM_LABELS) as Platform[]).map((platform) => (
@@ -354,7 +354,7 @@ export default function ClientPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base01">
+                <tr className="text-left text-base04 border-b border-base03 bg-base02">
                   <th className="px-3 py-2 font-normal whitespace-nowrap">client</th>
                   <th className="px-3 py-2 font-normal whitespace-nowrap">name</th>
                   <th className="px-3 py-2 font-normal whitespace-nowrap">platform</th>
@@ -430,7 +430,7 @@ export default function ClientPage() {
                       {cfg.system_type === "linux" && expandedCmdsKey === build.id && cmdsByBuildId[build.id] && (
                         <tr key={`${build.id}-cmds`} className="border-t border-base03">
                           <td colSpan={7} className="p-0">
-                            <div className="px-4 py-3 space-y-2 bg-base01">
+                            <div className="px-4 py-3 space-y-2 bg-base02">
                               <div className="grid gap-x-4 gap-y-1" style={{ gridTemplateColumns: "max-content 1fr" }}>
                                 <span className="text-base04">run:</span>
                                 <div>
@@ -499,7 +499,7 @@ export default function ClientPage() {
       </div>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 bg-base01">
+        <div className="px-4 py-2 border-b border-base03 bg-base02">
           <span className="text-base05">getting started</span>
         </div>
         <div className="px-4 py-4 space-y-4 text-base04">

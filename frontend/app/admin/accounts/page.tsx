@@ -43,14 +43,14 @@ export default function AdminAccountsPage() {
 
       {error && <p className="text-status-bad text-sm">{error}</p>}
 
-      <div className="border border-base03">
+      <div className="border border-base03 bg-base01">
         {accounts.length === 0 ? (
           <p className="px-4 py-6 text-base04">no accounts found.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base01">
+              <tr className="text-left text-base04 border-b border-base03 bg-base02">
                 <th className="px-4 py-2 font-normal">user</th>
                 <th className="px-4 py-2 font-normal">account</th>
                 <th className="px-4 py-2 font-normal">on</th>

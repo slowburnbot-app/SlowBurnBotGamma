@@ -45,7 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen flex flex-col font-mono">
-      <div className="flex-1 max-w-5xl mx-auto w-full sm:border-x border-base03">
+      <div className="flex-1 max-w-5xl mx-auto w-full bg-base00 sm:border-x border-base03">
         <header className="px-3 sm:px-6 py-3 flex flex-col-reverse gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3">
           <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-6 gap-y-1">
             <span className="font-semibold text-base0e">SlowBurnBot</span>

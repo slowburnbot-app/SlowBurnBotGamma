@@ -60,8 +60,8 @@ export default function AdminRequestsPage() {
       <h1 className="font-semibold text-base05">admin — requests</h1>
       {msg && <p className="text-status-bad">{msg}</p>}
 
-      <div className="border border-base03">
-        <div className="border-b border-base03 px-4 py-2 bg-base01">
+      <div className="border border-base03 bg-base01">
+        <div className="border-b border-base03 px-4 py-2 bg-base02">
           <span className="text-base05">account requests</span>
           <span className="text-base04 ml-2">[{requests.length}]</span>
           {newCount > 0 && <span className="text-status-warning ml-2">{newCount} new</span>}
@@ -72,7 +72,7 @@ export default function AdminRequestsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base01">
+                <tr className="text-left text-base04 border-b border-base03 bg-base02">
                   <th className="px-4 py-2 font-normal">date</th>
                   <th className="px-4 py-2 font-normal">name</th>
                   <th className="px-4 py-2 font-normal">email</th>
@@ -132,7 +132,7 @@ export default function AdminRequestsPage() {
                         </td>
                       </tr>
                       {isOpen && (
-                        <tr className="bg-base01">
+                        <tr className="bg-base02">
                           <td colSpan={8} className="px-4 py-3">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                               <div className="space-y-1">

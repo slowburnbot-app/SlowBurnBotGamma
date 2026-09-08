@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex flex-col font-mono">
-      <div className="flex-1 max-w-5xl mx-auto w-full sm:border-x border-base03">
+      <div className="flex-1 max-w-5xl mx-auto w-full bg-base00 sm:border-x border-base03">
         <header className="px-3 sm:px-6 pt-5 pb-3 flex flex-col gap-y-1">
           <div className="flex items-center justify-end gap-3 sm:gap-4">
             <button onClick={() => window.location.reload()} className="text-base03 hover:text-base04 cursor-pointer transition-colors" title="Click to reload">v{APP_VERSION}</button>

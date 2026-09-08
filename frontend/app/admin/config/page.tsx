@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
 
-const sectionCls = "border border-base03";
+const sectionCls = "border border-base03 bg-base01";
 
 export default function AdminConfigPage() {
   const [creds, setCreds] = useState<NotificationCredentials | null>(null);
@@ -87,7 +87,7 @@ export default function AdminConfigPage() {
       <h1 className="font-semibold text-base05">admin — Config</h1>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">Notification Settings</div>
+        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">Notification Settings</div>
 
         {/* SMTP row */}
         <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base03">

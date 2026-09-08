@@ -14,7 +14,7 @@ const NOTICES_OPTIONS = [
   { value: "both", label: "both" },
 ];
 
-const sectionCls = "border border-base03";
+const sectionCls = "border border-base03 bg-base01";
 
 function formatPhone(raw: string): string {
   const d = raw.replace(/\D/g, "").slice(0, 10);
@@ -119,7 +119,7 @@ export default function ConfigPage() {
       <h1 className="font-semibold text-base05">Config</h1>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">session settings</div>
+        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">session settings</div>
 
         <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
           <BracketCheckbox label="Like Suggested" checked={likeSuggested} onChange={setLikeSuggested} />
@@ -143,7 +143,7 @@ export default function ConfigPage() {
       </div>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">notifications</div>
+        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">notifications</div>
 
         <div className="px-4 grid items-center gap-x-3" style={{ gridTemplateColumns: "14ch auto auto auto" }}>
           <div className="py-2 border-b border-base03"><BracketCheckbox label="Session" checked={noticesSession} onChange={setNoticesSession} /></div>
@@ -169,7 +169,7 @@ export default function ConfigPage() {
       </div>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base01">universal ignore</div>
+        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">universal ignore</div>
 
         <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
           <BracketCheckbox label="Skip Private Accounts" checked={skipPrivate} onChange={setSkipPrivate} />
