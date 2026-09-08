@@ -199,32 +199,30 @@ export function Landing() {
         </header>
 
         <main className="px-3 sm:px-6 py-6 space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-            <section className="lg:col-span-3 space-y-3">
-              <h1 className="text-2xl sm:text-3xl text-base05 leading-snug">
-                grow your social presence —{" "}
-                <span className="text-base0d">steadily, consistently, and without the daily grind.</span>
-              </h1>
-              <p className="text-base04 leading-relaxed">
-                slowburnbot helps small businesses, agencies, and creators promote their social
-                profiles at a steady, sustainable pace. set your goals and your schedule once in a
-                clean web dashboard, then check back whenever you like to see how things are going.
-              </p>
-              <p className="text-base04 leading-relaxed">
-                built for people juggling more than one profile who want consistent, organic growth
-                without burning out — or burning through their audience&apos;s patience.
-              </p>
-            </section>
+          <section className="space-y-3 max-w-3xl">
+            <h1 className="text-2xl sm:text-3xl text-base05 leading-snug">
+              grow your social presence —{" "}
+              <span className="text-base0d">steadily, consistently, and without the daily grind.</span>
+            </h1>
+            <p className="text-base04 leading-relaxed">
+              slowburnbot helps small businesses, agencies, and creators promote their social
+              profiles at a steady, sustainable pace. set your goals and your schedule once in a
+              clean web dashboard, then check back whenever you like to see how things are going.
+            </p>
+            <p className="text-base04 leading-relaxed">
+              built for people juggling more than one profile who want consistent, organic growth
+              without burning out — or burning through their audience&apos;s patience.
+            </p>
+          </section>
 
-            <section id="sign-in" className="lg:col-span-2 border border-base02 bg-base01 scroll-mt-4">
-              <div className="border-b border-base02 px-4 py-2 bg-base02">
-                <span className="text-base05">sign in</span>
-              </div>
-              <div className="px-4 py-4">
-                <LoginForm showRegisterLink={false} />
-              </div>
-            </section>
-          </div>
+          <section id="sign-in" className="border border-base02 bg-base01 scroll-mt-4">
+            <div className="border-b border-base02 px-4 py-2 bg-base02">
+              <span className="text-base05">sign in</span>
+            </div>
+            <div className="px-4 py-4">
+              <LoginForm showRegisterLink={false} layout="inline" />
+            </div>
+          </section>
 
           <section className="border border-base02 bg-base01">
             <div className="border-b border-base02 px-4 py-2 bg-base02">
