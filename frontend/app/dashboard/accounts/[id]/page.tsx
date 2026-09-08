@@ -444,7 +444,8 @@ export default function AccountDetailPage() {
                         </Bracket>
                       </button>
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span className="text-base05">{"["}</span>
                       <Dropdown
                         value={action.type}
                         onChange={(v) => updateAction(i, { type: v })}
@@ -454,8 +455,10 @@ export default function AccountDetailPage() {
                           ...ACTION_TYPES.map((t) => ({ value: t, label: t })),
                         ]}
                       />
+                      <span className="text-base05">{"]"}</span>
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span className="text-base05">{"["}</span>
                       <Dropdown
                         value={action.target}
                         onChange={(v) => updateAction(i, { target: v })}
@@ -466,6 +469,7 @@ export default function AccountDetailPage() {
                           ...targets.map((t) => ({ value: t, label: t })),
                         ]}
                       />
+                      <span className="text-base05">{"]"}</span>
                     </td>
                     <td className="px-4 py-2">
                       <span className="inline-flex items-center gap-0">
