@@ -43,14 +43,14 @@ export default function AdminAccountsPage() {
 
       {error && <p className="text-status-bad text-sm">{error}</p>}
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {accounts.length === 0 ? (
           <p className="px-4 py-6 text-base04">no accounts found.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <th className="px-4 py-2 font-normal">user</th>
                 <th className="px-4 py-2 font-normal">account</th>
                 <th className="px-4 py-2 font-normal">on</th>
@@ -58,9 +58,9 @@ export default function AdminAccountsPage() {
                 <th className="px-4 py-2 font-normal"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {accounts.map((a) => (
-                <tr key={a.id} className="hover:bg-base02 transition-colors">
+                <tr key={a.id} className="hover:bg-base02/60 transition-colors">
                   <td className="px-4 py-2 text-base04 text-sm">{a.user_email}</td>
                   <td className="px-4 py-2 text-base05">{a.name}</td>
                   <td className="px-4 py-2">
@@ -84,14 +84,14 @@ export default function AdminAccountsPage() {
                       href={`/admin/accounts/${a.id}/follow-targets`}
                       className="group transition-colors"
                     >
-                      <Bracket className="text-base04 group-hover:text-base0e">
+                      <Bracket className="text-base04 group-hover:text-base0d">
                         follow-targets
                       </Bracket>
                     </Link>
                     <button
                       onClick={() => handleDelete(a)}
                       disabled={busy === a.id}
-                      className="group disabled:opacity-50 transition-colors bg-base11 border border-base03 px-2 py-0.5"
+                      className="group disabled:opacity-50 transition-colors bg-base11 border border-base02 px-2 py-0.5"
                     >
                       <Bracket className="text-status-bad group-hover:text-base05">
                         {busy === a.id ? "..." : "delete"}

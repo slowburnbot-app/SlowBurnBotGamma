@@ -17,9 +17,9 @@ const HIGHLIGHTS: [string, string][] = [
 ];
 
 const inputCls =
-  "flex-1 min-w-0 bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors";
+  "flex-1 min-w-0 bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors";
 const textareaCls =
-  "w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e px-2 py-1 font-mono transition-colors resize-y";
+  "w-full bg-transparent border border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d px-2 py-1 font-mono transition-colors resize-y";
 
 function RequestForm() {
   const [name, setName] = useState("");
@@ -168,7 +168,7 @@ function RequestForm() {
       </div>
       <div className="flex items-center justify-between pt-1">
         <button type="submit" disabled={busy} className="group disabled:opacity-50 transition-colors">
-          <Bracket className="text-base0e group-hover:text-base05">
+          <Bracket className="text-base0d group-hover:text-base05">
             {busy ? "sending…" : "request account"}
           </Bracket>
         </button>
@@ -190,11 +190,11 @@ export function Landing() {
 
   return (
     <div className="min-h-screen flex flex-col font-mono">
-      <div className="flex-1 max-w-5xl mx-auto w-full bg-base00 sm:border-x border-base03">
+      <div className="flex-1 max-w-5xl mx-auto w-full sm:border-x border-base02">
         <header className="px-3 sm:px-6 py-3 flex items-center justify-between">
-          <span className="font-semibold text-base0e">SlowBurnBot</span>
+          <span className="font-semibold text-base0d">SlowBurnBot</span>
           <a href="#sign-in" className="group transition-colors">
-            <Bracket className="text-base04 group-hover:text-base0e">sign in</Bracket>
+            <Bracket className="text-base04 group-hover:text-base0d">sign in</Bracket>
           </a>
         </header>
 
@@ -202,7 +202,7 @@ export function Landing() {
           <section className="space-y-3 max-w-3xl">
             <h1 className="text-2xl sm:text-3xl text-base05 leading-snug">
               grow your social presence —{" "}
-              <span className="text-base0e">steadily, consistently, and without the daily grind.</span>
+              <span className="text-base0d">steadily, consistently, and without the daily grind.</span>
             </h1>
             <p className="text-base04 leading-relaxed">
               slowburnbot helps small businesses, agencies, and creators promote their social
@@ -216,15 +216,15 @@ export function Landing() {
           </section>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-            <section className="lg:col-span-3 border border-base03 bg-base01">
-              <div className="border-b border-base03 px-4 py-2 bg-base02">
+            <section className="lg:col-span-3 border border-base02 bg-base01">
+              <div className="border-b border-base02 px-4 py-2 bg-base02">
                 <span className="text-base05">what you get</span>
               </div>
-              <ul className="divide-y divide-base03">
+              <ul className="divide-y divide-base02">
                 {HIGHLIGHTS.map(([title, body]) => (
                   <li key={title} className="px-4 py-3 space-y-0.5">
                     <div className="text-base05">
-                      <span className="text-base0e">*</span> {title}
+                      <span className="text-base0d">*</span> {title}
                     </div>
                     <div className="text-base04 text-sm leading-relaxed">{body}</div>
                   </li>
@@ -232,8 +232,8 @@ export function Landing() {
               </ul>
             </section>
 
-            <section id="sign-in" className="lg:col-span-2 border border-base03 bg-base01 scroll-mt-4">
-              <div className="border-b border-base03 px-4 py-2 bg-base02">
+            <section id="sign-in" className="lg:col-span-2 border border-base02 bg-base01 scroll-mt-4">
+              <div className="border-b border-base02 px-4 py-2 bg-base02">
                 <span className="text-base05">sign in</span>
               </div>
               <div className="px-4 py-4">
@@ -242,8 +242,8 @@ export function Landing() {
             </section>
           </div>
 
-          <section id="request" className="border border-base03 bg-base01 relative scroll-mt-4">
-            <div className="border-b border-base03 px-4 py-2 bg-base02 flex items-center justify-between">
+          <section id="request" className="border border-base02 bg-base01 relative scroll-mt-4">
+            <div className="border-b border-base02 px-4 py-2 bg-base02 flex items-center justify-between">
               <span className="text-base05">request an account</span>
               <span className="text-base04 text-sm">tell us a bit about what you run</span>
             </div>
@@ -251,7 +251,7 @@ export function Landing() {
           </section>
         </main>
 
-        <footer className="px-3 sm:px-6 py-4 border-t border-base03 text-base04 text-sm">
+        <footer className="px-3 sm:px-6 py-4 border-t border-base02 text-base04 text-sm">
           slowburnbot — patient growth for busy people.
         </footer>
       </div>

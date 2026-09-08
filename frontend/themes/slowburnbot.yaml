@@ -9,7 +9,7 @@ palette:
   # Monotones
   base00: "141413"  # Default Background        — centered content container
   base01: "1c1b1a"  # Lighter Background        — panel / table body
-  base02: "242322"  # Selection Background      — section headers, row hover, select option bg
+  base02: "302f2c"  # Selection Background      — lines, section headers, row hover
   base03: "3d3d3a"  # Comments / Line Highlight — borders, dividers
   base04: "9a968b"  # Dark Foreground           — secondary / muted text
   base05: "f4f3ee"  # Default Foreground        — primary text
@@ -21,11 +21,11 @@ palette:
   base0A: "e5c07b"  # Yellow                    — counts, warm highlights, warning status
   base0B: "a0b87c"  # Green                     — success
   base0C: "7aaa96"  # Cyan                      — (reserved)
-  base0D: "8aa5c4"  # Blue                      — (reserved)
-  base0E: "d97757"  # Purple                    — links, CTAs, focus rings, accent
+  base0D: "d97757"  # Blue                      — links, CTAs, focus rings, accent
+  base0E: "8aa5c4"  # Purple                    — (reserved)
   base0F: "a8765a"  # Brown                     — (reserved)
   # Extensions
-  base10: "0d0c0c"  # Darker Background         — page bg (behind the container)
+  base10: "0d0c0c"  # Darker Background         — (reserved)
   base11: "2e2d2b"  # Brighter Background       — dropdown row hover, small buttons
   # Brights
   base12: "cf3b0a"  # Bright Red                — error / destructive

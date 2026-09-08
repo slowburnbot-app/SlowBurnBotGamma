@@ -144,7 +144,7 @@ export default function AccountsPage() {
     const arrow = active ? (sortDir === "asc" ? "↑" : "↓") : "\u00a0";
     return (
       <th
-        className={`px-[6px] py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0e" : ""} ${className}`}
+        className={`px-[6px] py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0d" : ""} ${className}`}
         onClick={() => toggleSort(field)}
       >
         <span className="whitespace-nowrap">{label}<span className="inline-block w-[1em] text-center">{arrow}</span></span>
@@ -246,20 +246,20 @@ export default function AccountsPage() {
               onClick={() => setTab(t.key)}
               className="group cursor-pointer transition-colors"
             >
-              <Bracket className={tab === t.key ? "text-base0e" : "text-base04 group-hover:text-white"}>{t.label}</Bracket>
+              <Bracket className={tab === t.key ? "text-base0d" : "text-base04 group-hover:text-white"}>{t.label}</Bracket>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {accounts.length === 0 ? (
           <p className="px-4 py-6 font-mono text-base04">No accounts yet.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full font-mono">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <SortTh label="On" field="enabled" />
                 <SortTh label="Account" field="name" />
                 {tab === "settings" && (
@@ -325,13 +325,13 @@ export default function AccountsPage() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {sortedAccounts.map((account) => {
                 const stats = statsMap[account.id];
                 const log = logMap[account.id];
                 const fb = fbMap[account.id];
                 return (
-                  <tr key={account.id} className={`hover:bg-base02 transition-colors ${account.system_disabled ? "text-base03" : account.enabled ? "text-base05" : "text-base04"}`}>
+                  <tr key={account.id} className={`hover:bg-base02/60 transition-colors ${account.system_disabled ? "text-base03" : account.enabled ? "text-base05" : "text-base04"}`}>
                     <td className="px-[6px] py-2 whitespace-nowrap">
                       {account.system_disabled ? (
                         <Bracket className="text-base03">-</Bracket>
@@ -400,22 +400,22 @@ export default function AccountsPage() {
                       <div className="flex items-center justify-end gap-1">
                         {tab === "settings" && (
                           <Link href={`/dashboard/accounts/${account.id}`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">settings</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">settings</Bracket>
                           </Link>
                         )}
                         {tab === "activity" && (
                           <Link href={`/dashboard/accounts/${account.id}/log`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">log</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">log</Bracket>
                           </Link>
                         )}
                         {tab === "stats" && (
                           <Link href={`/dashboard/accounts/${account.id}/stats`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">stats</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">stats</Bracket>
                           </Link>
                         )}
                         {tab === "database" && (
                           <Link href={`/dashboard/accounts/${account.id}/database`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">data</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">data</Bracket>
                           </Link>
                         )}
                       </div>
@@ -435,8 +435,8 @@ export default function AccountsPage() {
         <BracketInput label="user name" value={newName} onChange={setNewName} width="16ch" autoComplete="off" />
         <BracketInput label="password" value={newPassword} onChange={setNewPassword} width="24ch" type="password" autoComplete="new-password" />
         {error && <span className="text-status-bad">{error}</span>}
-        <button type="submit" disabled={adding} className="group cursor-pointer disabled:opacity-40 transition-colors ml-auto bg-base11 border border-base03 px-2 py-0.5">
-          <Bracket className="text-base0e group-hover:text-base05">{adding ? "adding…" : "add"}</Bracket>
+        <button type="submit" disabled={adding} className="group cursor-pointer disabled:opacity-40 transition-colors ml-auto bg-base11 border border-base02 px-2 py-0.5">
+          <Bracket className="text-base0d group-hover:text-base05">{adding ? "adding…" : "add"}</Bracket>
         </button>
       </form>
     </div>

@@ -171,7 +171,7 @@ export default function DashboardPage() {
     const arrow = active ? (sortDir === "asc" ? "↑" : "↓") : "\u00a0";
     return (
       <th
-        className={`px-[6px] py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0e" : ""} ${className}`}
+        className={`px-[6px] py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0d" : ""} ${className}`}
         onClick={() => toggleSort(field)}
       >
         <span className="whitespace-nowrap">{label}<span className="inline-block w-[1em] text-center">{arrow}</span></span>
@@ -268,7 +268,7 @@ export default function DashboardPage() {
         Clients <span className="text-base0a font-normal">[{String(subInfo?.current_clients ?? 0).padStart(2, "0")}/{subInfo?.max_clients ? String(subInfo.max_clients).padStart(2, "0") : "--"}]</span>
       </h2>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {clientStatus.length === 0 ? (
           clientStatusError ? (
             <p className="px-4 py-6 text-status-bad">client status unavailable — could not reach the server.</p>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <th className="px-2.5 py-2 font-normal">Client</th>
                 <th className="px-2.5 py-2 font-normal">Name</th>
                 <th className="px-2.5 py-2 font-normal">OS</th>
@@ -290,9 +290,9 @@ export default function DashboardPage() {
                 <th className="w-full"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {clientStatus.map((cs) => (
-                <tr key={cs.client_id} className="hover:bg-base02 transition-colors">
+                <tr key={cs.client_id} className="hover:bg-base02/60 transition-colors">
                   <td className="px-2.5 py-2 text-base05 whitespace-nowrap">{String(cs.client_id).padStart(2, "0")}</td>
                   <td className="px-2.5 py-2 text-base04 whitespace-nowrap">{cs.client_name || "----"}</td>
                   <td className="px-2.5 py-2 text-base04 whitespace-nowrap">{cs.system_type || "----"}</td>
@@ -352,20 +352,20 @@ export default function DashboardPage() {
               onClick={() => setTab(t.key)}
               className="group cursor-pointer transition-colors"
             >
-              <Bracket className={tab === t.key ? "text-base0e" : "text-base04 group-hover:text-white"}>{t.label}</Bracket>
+              <Bracket className={tab === t.key ? "text-base0d" : "text-base04 group-hover:text-white"}>{t.label}</Bracket>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {accounts.length === 0 ? (
           <p className="px-4 py-6 font-mono text-base04">No accounts yet.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full font-mono">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <SortTh label="On" field="enabled" />
                 <SortTh label="Account" field="name" />
                 {tab === "settings" && (
@@ -431,13 +431,13 @@ export default function DashboardPage() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {sortedAccounts.map((account) => {
                 const stats = statsMap[account.id];
                 const log = logMap[account.id];
                 const fb = fbMap[account.id];
                 return (
-                  <tr key={account.id} className={`hover:bg-base02 transition-colors ${account.system_disabled ? "text-base03" : account.enabled ? "text-base05" : "text-base04"}`}>
+                  <tr key={account.id} className={`hover:bg-base02/60 transition-colors ${account.system_disabled ? "text-base03" : account.enabled ? "text-base05" : "text-base04"}`}>
                     <td className="px-[6px] py-2 whitespace-nowrap">
                       {account.system_disabled ? (
                         <Bracket className="text-base03">-</Bracket>
@@ -503,22 +503,22 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-end gap-1">
                         {tab === "settings" && (
                           <Link href={`/dashboard/accounts/${account.id}`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">settings</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">settings</Bracket>
                           </Link>
                         )}
                         {tab === "activity" && (
                           <Link href={`/dashboard/accounts/${account.id}/log`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">log</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">log</Bracket>
                           </Link>
                         )}
                         {tab === "stats" && (
                           <Link href={`/dashboard/accounts/${account.id}/stats`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">stats</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">stats</Bracket>
                           </Link>
                         )}
                         {tab === "database" && (
                           <Link href={`/dashboard/accounts/${account.id}/database`} className="group font-mono transition-colors">
-                            <Bracket className="text-base04 group-hover:text-base0e">data</Bracket>
+                            <Bracket className="text-base04 group-hover:text-base0d">data</Bracket>
                           </Link>
                         )}
                       </div>
@@ -538,19 +538,19 @@ export default function DashboardPage() {
       <div className="flex items-center gap-4">
         <h2 className="font-semibold text-base05">Recent Activity</h2>
         <span className="text-base04">--</span>
-        <Link href="/dashboard/accounts?tab=activity" className="text-base0e hover:text-base05 transition-colors">
+        <Link href="/dashboard/accounts?tab=activity" className="text-base0d hover:text-base05 transition-colors">
           by account →
         </Link>
       </div>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {recentLog.length === 0 ? (
           <div className="px-4 py-6 text-base04">no session log entries yet.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base02">
+                <tr className="text-left text-base04 border-b border-base02 bg-base02">
                   <th className="px-[6px] py-2 font-normal whitespace-nowrap">account</th>
                   <th className="px-[6px] py-2 font-normal whitespace-nowrap">date</th>
                   <th className="px-[6px] py-2 font-normal whitespace-nowrap">run</th>
@@ -577,11 +577,11 @@ export default function DashboardPage() {
                   const rowBg = altDay ? "bg-base02" : "";
                   return (
                   <>
-                  <tr key={entry.id} className={`hover:bg-base02 transition-colors border-t border-base03 ${rowBg}`}>
+                  <tr key={entry.id} className={`hover:bg-base02/60 transition-colors border-t border-base02 ${rowBg}`}>
                     <td className="px-2 py-1.5 whitespace-nowrap">
                       <Link
                         href={`/dashboard/accounts/${entry.account_id}/log`}
-                        className="text-base0e hover:text-base05 transition-colors"
+                        className="text-base0d hover:text-base05 transition-colors"
                       >
                         {entry.account_name}
                       </Link>

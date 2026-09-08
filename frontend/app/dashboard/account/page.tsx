@@ -64,23 +64,23 @@ function ThemeSelector() {
           </button>
         )}
       </div>
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         <table className="w-full">
           <thead>
-            <tr className="text-left text-base04 border-b border-base03 bg-base02">
+            <tr className="text-left text-base04 border-b border-base02 bg-base02">
               <th className="px-[6px] py-2 font-normal">name</th>
               <th className="px-[6px] py-2 font-normal">preview</th>
               <th className="px-[6px] py-2 font-normal text-right"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-base03">
+          <tbody className="divide-y divide-base02">
             {themes.map((t) => {
               const isCurrent = t.slug === applied;
               const isDefault = t.slug === ACTIVE_THEME;
               return (
-                <tr key={t.slug} className={isCurrent ? "" : "hover:bg-base02 transition-colors"}>
+                <tr key={t.slug} className={isCurrent ? "" : "hover:bg-base02/60 transition-colors"}>
                   <td className="px-[6px] py-2">
-                    <span className={isCurrent ? "text-base0e font-semibold" : "text-base04"}>
+                    <span className={isCurrent ? "text-base0d font-semibold" : "text-base04"}>
                       {t.name}
                     </span>
                     {isDefault && (
@@ -105,7 +105,7 @@ function ThemeSelector() {
                   </td>
                   <td className="px-[6px] py-2 text-right">
                     {isCurrent ? (
-                      <Bracket className="text-base0e">active</Bracket>
+                      <Bracket className="text-base0d">active</Bracket>
                     ) : (
                       <button onClick={() => apply(t.slug)} className="group cursor-pointer transition-colors">
                         <Bracket className="text-base04 group-hover:text-base05">apply</Bracket>
@@ -175,8 +175,8 @@ export default function AccountPage() {
         <h2 className="font-semibold text-base05">plan</h2>
         {info ? (
           <>
-            <div className="border border-base03 bg-base01">
-              <div className="border-b border-base03 px-[6px] py-2 bg-base02 text-base04 flex items-center justify-between">
+            <div className="border border-base02 bg-base01">
+              <div className="border-b border-base02 px-[6px] py-2 bg-base02 text-base04 flex items-center justify-between">
                 <span>current plan</span>
                 {hasBillableSubscription && (
                   <button onClick={handleManageBilling} disabled={busy !== null} className="group cursor-pointer transition-colors disabled:opacity-50">
@@ -205,10 +205,10 @@ export default function AccountPage() {
             {msg && <p className="text-status-bad text-sm">{msg}</p>}
 
             <h2 className="font-semibold text-base05">available plans</h2>
-            <div className="border border-base03 bg-base01">
+            <div className="border border-base02 bg-base01">
               <table className="w-full">
                 <thead>
-                  <tr className="text-left text-base04 border-b border-base03 bg-base02">
+                  <tr className="text-left text-base04 border-b border-base02 bg-base02">
                     <th className="px-[6px] py-2 font-normal">tier</th>
                     <th className="px-[6px] py-2 font-normal">price</th>
                     <th className="px-[6px] py-2 font-normal">accounts</th>
@@ -216,14 +216,14 @@ export default function AccountPage() {
                     <th className="px-[6px] py-2 font-normal text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-base03">
+                <tbody className="divide-y divide-base02">
                   {info.tiers.map((tier) => {
                     const isCurrent = tier.name === info.plan_tier;
                     const isUpgrade = tier.max_accounts > info.max_accounts;
                     return (
-                      <tr key={tier.name} className={isCurrent ? "" : "hover:bg-base02 transition-colors"}>
+                      <tr key={tier.name} className={isCurrent ? "" : "hover:bg-base02/60 transition-colors"}>
                         <td className="px-[6px] py-2">
-                          <span className={`capitalize font-semibold ${isCurrent ? "text-base0e" : "text-base04"}`}>
+                          <span className={`capitalize font-semibold ${isCurrent ? "text-base0d" : "text-base04"}`}>
                             {tier.name}
                           </span>
                         </td>
@@ -232,7 +232,7 @@ export default function AccountPage() {
                         <td className={`px-[6px] py-2 ${isCurrent ? "text-base05" : "text-base04"}`}>{tier.max_clients}</td>
                         <td className="px-[6px] py-2 text-right">
                           {isCurrent && hasBillableSubscription ? (
-                            <Bracket className="text-base0e">current plan</Bracket>
+                            <Bracket className="text-base0d">current plan</Bracket>
                           ) : isCurrent ? (
                             // Current tier, but no Stripe customer yet (demo
                             // / admin-activated / invite-trial account) —

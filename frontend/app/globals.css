@@ -14,7 +14,6 @@
   /* Semantic aliases — pointers into the base24 layer. Existing classes like
      text-status-ok and selectors using var(--background) keep working. */
   --background:       var(--base00);
-  --page-background:  var(--base10);
   --foreground:       var(--base05);
   --status-ok:            var(--base0b);
   --status-bad:           var(--base12);
@@ -25,7 +24,7 @@
 
 @theme {
   /* Expose every base24 slot as a Tailwind color (bg-base00, text-base05,
-     border-base03, ring-base09, etc.). Values are resolved by the browser
+     border-base02, ring-base0d, etc.). Values are resolved by the browser
      against the :root vars injected from the YAML at render time. */
   --color-base00: var(--base00);
   --color-base01: var(--base01);
@@ -36,7 +35,7 @@
   --color-base06: var(--base06);
   --color-base07: var(--base07);
   --color-base08: var(--base08);
-  --color-base09: var(--base0e);
+  --color-base09: var(--base09);
   --color-base0a: var(--base0a);
   --color-base0b: var(--base0b);
   --color-base0c: var(--base0c);
@@ -68,10 +67,13 @@ html {
 }
 
 body {
-  /* Surface layering, darkest to lightest: page (base10) → centered
-     content container (base00) → panel/table body (base01) → section
-     header strips and row hover (base02). */
-  background: var(--page-background);
+  /* Slot → surface mapping, kept identical to portal's so any Base24
+     scheme renders the same in both apps: page = base00, panel/table
+     body = base01, lines + section header strips + row hover = base02
+     (hover at 60% alpha), dim text = base03, muted = base04, text =
+     base05, accent = base0D. base10/base11 are not relied on for
+     layering — schemes disagree on them. */
+  background: var(--background);
   color: var(--foreground);
   font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
 }

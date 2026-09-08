@@ -46,7 +46,7 @@ export function LoginForm({ showRegisterLink = true }: { showRegisterLink?: bool
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
-          className="flex-1 bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors"
+          className="flex-1 bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export function LoginForm({ showRegisterLink = true }: { showRegisterLink?: bool
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="current-password"
-          className="flex-1 bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors"
+          className="flex-1 bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors"
         />
       </div>
       <div className="flex items-center justify-between pt-1">
@@ -67,12 +67,12 @@ export function LoginForm({ showRegisterLink = true }: { showRegisterLink?: bool
           disabled={loading}
           className="group disabled:opacity-50 transition-colors"
         >
-          <Bracket className="text-base0e group-hover:text-base05">
+          <Bracket className="text-base0d group-hover:text-base05">
             {loading ? "signing in…" : "sign in"}
           </Bracket>
         </button>
         {showRegisterLink && (
-          <Link href="/register" className="text-base04 hover:text-base0e transition-colors">
+          <Link href="/register" className="text-base04 hover:text-base0d transition-colors">
             register →
           </Link>
         )}

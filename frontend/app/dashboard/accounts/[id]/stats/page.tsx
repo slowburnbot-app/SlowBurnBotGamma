@@ -47,7 +47,7 @@ export default function AccountStatsPage() {
     const arrow = active ? (sortDir === "asc" ? "\u2191" : "\u2193") : "\u00a0";
     return (
       <th
-        className={`px-4 py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0e" : ""} ${className}`}
+        className={`px-4 py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0d" : ""} ${className}`}
         onClick={() => toggleSort(field)}
       >
         <span className="whitespace-nowrap">{label}<span className="inline-block w-[1em] text-center">{arrow}</span></span>
@@ -114,11 +114,11 @@ export default function AccountStatsPage() {
         <span className="text-base05">{account.name}</span>
       </div>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-base04 border-b border-base03 bg-base02">
+            <tr className="text-left text-base04 border-b border-base02 bg-base02">
               <SortTh label="source" field="source" />
               <SortTh label="Complete" field="complete" />
               <SortTh label="Followed Back" field="followed_back" />
@@ -138,14 +138,14 @@ export default function AccountStatsPage() {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-base03">
+          <tbody className="divide-y divide-base02">
             {loading ? (
               <tr><td colSpan={6} className="px-4 py-6 text-base04">loading&hellip;</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-6 text-base04">no follow data yet.</td></tr>
             ) : (
               sorted.map((s, i) => (
-                <tr key={i} className="hover:bg-base02 transition-colors">
+                <tr key={i} className="hover:bg-base02/60 transition-colors">
                   <td className="px-4 py-1.5 text-base05">{s.source ?? "—"}</td>
                   <td className="px-4 py-1.5 text-base04">{s.complete.toLocaleString()}</td>
                   <td className="px-4 py-1.5 text-base04">{s.followed_back.toLocaleString()}</td>
@@ -158,7 +158,7 @@ export default function AccountStatsPage() {
           </tbody>
           {items.length > 0 && (
             <tfoot>
-              <tr className="text-base04 border-t border-base03 bg-base02">
+              <tr className="text-base04 border-t border-base02 bg-base02">
                 <td className="px-4 py-2 text-base05">total</td>
                 <td className="px-4 py-2">{totals.complete.toLocaleString()}</td>
                 <td className="px-4 py-2">{totals.followed_back.toLocaleString()}</td>

@@ -54,7 +54,7 @@ export default function FollowTargetsPage() {
         </span>
       </div>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {loading ? (
           <p className="px-4 py-6 text-base04">loading…</p>
         ) : items.length === 0 ? (
@@ -63,7 +63,7 @@ export default function FollowTargetsPage() {
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <th className="px-4 py-2 font-normal">handle</th>
                 <th className="px-4 py-2 font-normal">source</th>
                 <th className="px-4 py-2 font-normal">status</th>
@@ -72,9 +72,9 @@ export default function FollowTargetsPage() {
                 <th className="px-4 py-2 font-normal">fb</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {items.map((t) => (
-                <tr key={t.id} className="hover:bg-base02 transition-colors">
+                <tr key={t.id} className="hover:bg-base02/60 transition-colors">
                   <td className="px-4 py-1.5 text-base05">{t.target_handle}</td>
                   <td className="px-4 py-1.5 text-base04 text-xs">{t.source ?? "—"}</td>
                   <td className={`px-4 py-1.5 ${statusCls(t.status)}`}>{t.status}</td>

@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import { Bracket } from "@/lib/bracket";
 
-const sectionCls = "border border-base03 bg-base01";
+const sectionCls = "border border-base02 bg-base01";
 
 export default function AdminConfigPage() {
   const [creds, setCreds] = useState<NotificationCredentials | null>(null);
@@ -87,10 +87,10 @@ export default function AdminConfigPage() {
       <h1 className="font-semibold text-base05">admin — Config</h1>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">Notification Settings</div>
+        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">Notification Settings</div>
 
         {/* SMTP row */}
-        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base03">
+        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base02">
           <span className="text-base04" style={{ width: "8ch" }}>smtp:</span>
 
           <span className="inline-flex items-center gap-0">
@@ -167,7 +167,7 @@ export default function AdminConfigPage() {
         </div>
 
         {/* Resend row */}
-        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base03">
+        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base02">
           <span className="text-base04" style={{ width: "8ch" }}>resend:</span>
 
           <span className="inline-flex items-center gap-0">
@@ -229,7 +229,7 @@ export default function AdminConfigPage() {
         </div>
 
         {/* Account-request notifications row */}
-        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base03">
+        <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap text-sm border-b border-base02">
           <span className="text-base04" style={{ width: "8ch" }}>requests:</span>
 
           <span className="inline-flex items-center gap-0">
@@ -287,9 +287,9 @@ export default function AdminConfigPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="group disabled:opacity-50 transition-colors bg-base11 border border-base03 px-2 py-0.5"
+          className="group disabled:opacity-50 transition-colors bg-base11 border border-base02 px-2 py-0.5"
         >
-          <Bracket className="text-base0e group-hover:text-base05">
+          <Bracket className="text-base0d group-hover:text-base05">
             {saving ? "saving…" : "save"}
           </Bracket>
         </button>

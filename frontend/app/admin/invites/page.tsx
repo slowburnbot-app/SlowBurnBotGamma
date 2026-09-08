@@ -80,8 +80,8 @@ export default function AdminInvitesPage() {
       <h1 className="font-semibold text-base05">admin — invites</h1>
       {msg && <p className="text-status-ok">{msg}</p>}
 
-      <div className="border border-base03 bg-base01">
-        <div className="border-b border-base03 px-4 py-2 bg-base02">
+      <div className="border border-base02 bg-base01">
+        <div className="border-b border-base02 px-4 py-2 bg-base02">
           <span className="text-base05">generate invite</span>
         </div>
         <form onSubmit={handleGenerate} className="px-4 py-3 space-y-3">
@@ -93,7 +93,7 @@ export default function AdminInvitesPage() {
                 placeholder="optional"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors w-56"
+                className="bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors w-56"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -137,7 +137,7 @@ export default function AdminInvitesPage() {
               disabled={busy}
               className="group disabled:opacity-50 transition-colors"
             >
-              <Bracket className="text-base0e group-hover:text-base05">
+              <Bracket className="text-base0d group-hover:text-base05">
                 {busy ? "..." : "generate"}
               </Bracket>
             </button>
@@ -145,8 +145,8 @@ export default function AdminInvitesPage() {
         </form>
       </div>
 
-      <div className="border border-base03 bg-base01">
-        <div className="border-b border-base03 px-4 py-2 bg-base02">
+      <div className="border border-base02 bg-base01">
+        <div className="border-b border-base02 px-4 py-2 bg-base02">
           <span className="text-base05">invite codes</span>
           <span className="text-base04 ml-2">[{invites.length}]</span>
         </div>
@@ -156,7 +156,7 @@ export default function AdminInvitesPage() {
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <th className="px-4 py-2 font-normal">code</th>
                 <th className="px-4 py-2 font-normal">email</th>
                 <th className="px-4 py-2 font-normal">tier</th>
@@ -166,11 +166,11 @@ export default function AdminInvitesPage() {
                 <th className="px-4 py-2 font-normal"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {invites.map((inv) => {
                 const invStatus = getStatus(inv);
                 return (
-                  <tr key={inv.id} className="hover:bg-base02 transition-colors">
+                  <tr key={inv.id} className="hover:bg-base02/60 transition-colors">
                     <td className="px-4 py-2 text-base05 font-semibold">{inv.code}</td>
                     <td className="px-4 py-2 text-base04">{inv.email || "----"}</td>
                     <td className="px-4 py-2 text-base04">{inv.plan_tier}</td>

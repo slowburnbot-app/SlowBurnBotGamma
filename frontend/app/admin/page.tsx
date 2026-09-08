@@ -96,14 +96,14 @@ export default function AdminPage() {
     <div className="space-y-4 font-mono">
       <h1 className="font-semibold text-base05">admin — users</h1>
       {msg && <p className="text-status-ok">{msg}</p>}
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {users.length === 0 ? (
           <p className="px-4 py-6 text-base04">no users found.</p>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <th className="px-4 py-2 font-normal">email</th>
                 <th className="px-4 py-2 font-normal">tier</th>
                 <th className="px-4 py-2 font-normal">status</th>
@@ -111,9 +111,9 @@ export default function AdminPage() {
                 <th className="px-4 py-2 font-normal"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {users.map((u) => (
-                <tr key={u.id} className="hover:bg-base02 transition-colors">
+                <tr key={u.id} className="hover:bg-base02/60 transition-colors">
                   <td className="px-4 py-2 text-base05">{u.email}</td>
                   <td className="px-4 py-2">
                     <span className="inline-flex items-center gap-0">
@@ -150,7 +150,7 @@ export default function AdminPage() {
                       disabled={busy === u.id}
                       className="group disabled:opacity-50 transition-colors"
                     >
-                      <Bracket className="text-base0e group-hover:text-base05">
+                      <Bracket className="text-base0d group-hover:text-base05">
                         {busy === u.id ? "..." : "trial 30d"}
                       </Bracket>
                     </button>
@@ -159,7 +159,7 @@ export default function AdminPage() {
                       disabled={busy === u.id}
                       className="group disabled:opacity-50 transition-colors"
                     >
-                      <Bracket className="text-base0e group-hover:text-base05">
+                      <Bracket className="text-base0d group-hover:text-base05">
                         {busy === u.id ? "..." : "sync stripe"}
                       </Bracket>
                     </button>

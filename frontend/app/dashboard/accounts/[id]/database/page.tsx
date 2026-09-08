@@ -55,7 +55,7 @@ export default function AccountDatabasePage() {
     const arrow = active ? (sortDir === "asc" ? "↑" : "↓") : "\u00a0";
     return (
       <th
-        className={`px-4 py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0e" : ""} ${className}`}
+        className={`px-4 py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0d" : ""} ${className}`}
         onClick={() => toggleSort(field)}
       >
         <span className="whitespace-nowrap">{label}<span className="inline-block w-[1em] text-center">{arrow}</span></span>
@@ -99,7 +99,7 @@ export default function AccountDatabasePage() {
         <span className="text-base04 ml-auto">[{total.toLocaleString()} records]</span>
       </div>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {loading ? (
           <p className="px-4 py-6 text-base04">loading…</p>
         ) : items.length === 0 ? (
@@ -108,7 +108,7 @@ export default function AccountDatabasePage() {
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <SortTh label="handle" field="handle" />
                 <SortTh label="source" field="source" />
                 <SortTh label="status" field="status" />
@@ -117,9 +117,9 @@ export default function AccountDatabasePage() {
                 <SortTh label="fb" field="fb" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {items.map((t) => (
-                <tr key={t.id} className="hover:bg-base02 transition-colors">
+                <tr key={t.id} className="hover:bg-base02/60 transition-colors">
                   <td className="px-4 py-1.5 text-base05">{t.target_handle}</td>
                   <td className="px-4 py-1.5 text-base04 text-xs">{t.source ?? "—"}</td>
                   <td className={`px-4 py-1.5 ${statusCls(t.status)}`}>{t.status}</td>

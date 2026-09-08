@@ -92,7 +92,7 @@ function normalizeList(raw: string | null | undefined, kind: "accounts" | "topic
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
-const sectionCls = "border border-base03 bg-base01";
+const sectionCls = "border border-base02 bg-base01";
 
 // ── component ─────────────────────────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ export default function AccountDetailPage() {
 
         {/* Configuration */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">configuration</div>
+          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">configuration</div>
           <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
 
             <BracketCheckbox
@@ -268,7 +268,7 @@ export default function AccountDetailPage() {
                   setAccount((a) => a && { ...a, group_number: val ? +val : null });
                 }}
                 onBlur={() => handleAccountField({ group_number: account.group_number })}
-                className="w-5 bg-transparent border-b border-base03 text-base05 outline-none focus:border-base0e font-mono transition-colors placeholder-base04 text-center"
+                className="w-5 bg-transparent border-b border-base02 text-base05 outline-none focus:border-base0d font-mono transition-colors placeholder-base04 text-center"
               />
               <span className="text-base05">{"]"}</span>
             </span>
@@ -304,7 +304,7 @@ export default function AccountDetailPage() {
                   className="group cursor-pointer transition-colors inline-flex items-center gap-0"
                 >
                   <span className="text-base05">[</span>
-                  <span style={{ paddingLeft: "1ch", paddingRight: "1ch" }} className={account.has_password ? "text-status-ok group-hover:text-base0e" : "text-base04 group-hover:text-base0e"}>
+                  <span style={{ paddingLeft: "1ch", paddingRight: "1ch" }} className={account.has_password ? "text-status-ok group-hover:text-base0d" : "text-base04 group-hover:text-base0d"}>
                     {account.has_password ? "******" : "------"}
                   </span>
                   <span className="text-base05">]</span>
@@ -318,7 +318,7 @@ export default function AccountDetailPage() {
         {/* Action limits — read-only: Instagram throttling detected by the bot.
             Not part of the form's save semantics (no inputs). */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">action limits</div>
+          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">action limits</div>
           <div className="px-4 py-3 space-y-2">
             <div className="grid gap-x-3 gap-y-1" style={{ gridTemplateColumns: "9ch auto" }}>
               {(["like", "follow", "unfollow"] as const).map((verb) => {
@@ -354,7 +354,7 @@ export default function AccountDetailPage() {
               </span>
             </div>
             {limitEvents.length > 0 && (
-              <div className="pt-2 border-t border-base03 space-y-0.5">
+              <div className="pt-2 border-t border-base02 space-y-0.5">
                 <div className="text-base04">recent events</div>
                 {limitEvents.map((ev) => (
                   <div key={ev.id} className="text-base04 whitespace-nowrap overflow-hidden text-ellipsis">
@@ -372,7 +372,7 @@ export default function AccountDetailPage() {
 
         {/* Schedule */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">schedule</div>
+          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">schedule</div>
           <div className="px-4 py-3 space-y-2">
 
             <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
@@ -472,11 +472,11 @@ export default function AccountDetailPage() {
 
         {/* Actions */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">session actions</div>
+          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">session actions</div>
           <div className="overflow-x-auto">
           <table className="w-full font-mono">
             <thead>
-              <tr className="text-left text-base04 border-b border-base03 bg-base02">
+              <tr className="text-left text-base04 border-b border-base02 bg-base02">
                 <th className="px-4 py-2 font-normal w-10"></th>
                 <th className="px-4 py-2 font-normal w-10">on</th>
                 <th className="px-4 py-2 font-normal">type</th>
@@ -485,7 +485,7 @@ export default function AccountDetailPage() {
                 <th className="px-4 py-2 font-normal w-28">random</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-base03">
+            <tbody className="divide-y divide-base02">
               {actions.map((action, i) => {
                 const targets = action.type ? (ACTION_TARGETS[action.type] ?? []) : [];
                 return (
@@ -553,7 +553,7 @@ export default function AccountDetailPage() {
             </tbody>
           </table>
           </div>
-          <div className="px-4 py-3 border-t border-base03">
+          <div className="px-4 py-3 border-t border-base02">
             <BracketCheckbox
               label="run session actions in random order"
               checked={settings.actions_random_order ?? false}
@@ -564,8 +564,8 @@ export default function AccountDetailPage() {
 
         {/* Follow Settings */}
         <div className={sectionCls}>
-          <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">follow settings</div>
-          <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base03">
+          <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">follow settings</div>
+          <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base02">
 
             <span className="inline-flex items-center gap-0">
               <span className="text-base04">{"unfollow after: "}</span>
@@ -580,7 +580,7 @@ export default function AccountDetailPage() {
             </span>
 
           </div>
-          <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base03">
+          <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap border-b border-base02">
             <span className="text-base04">follow filters (0 = off):</span>
             <span className="inline-flex items-center gap-0">
               <span className="text-base04">{"max followers: "}</span>
@@ -628,7 +628,7 @@ export default function AccountDetailPage() {
                   value={settings.account_group ?? ""}
                   onChange={(e) => setSettings((s) => ({ ...s, account_group: e.target.value || null }))}
                   onBlur={() => setSettings((s) => ({ ...s, account_group: normalizeList(s.account_group, "accounts") }))}
-                  className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
+                  className="w-full bg-transparent border border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
                 />
               </div>
 
@@ -641,7 +641,7 @@ export default function AccountDetailPage() {
                 <span className="text-base03 ml-2">{`(${seeds.filter((s) => s.active).length} active - grows from "similar accounts" when under 10)`}</span>
               </div>
               <div className={poolMode ? "transition-opacity" : "opacity-40 transition-opacity"}>
-              <div className="border border-base03 p-2 space-y-1 max-h-64 overflow-y-auto">
+              <div className="border border-base02 p-2 space-y-1 max-h-64 overflow-y-auto">
                 {seeds.length === 0 && <div className="text-base04">----</div>}
                 {seeds.map((s) => (
                   <div key={s.id} className="flex items-center gap-2 flex-wrap">
@@ -652,7 +652,7 @@ export default function AccountDetailPage() {
                       className="group cursor-pointer inline-flex items-center gap-0"
                     >
                       <span className="text-base05">[</span>
-                      <span className={s.active ? "text-status-ok group-hover:text-base0e" : "text-base04 group-hover:text-base0e"}>{s.active ? "x" : " "}</span>
+                      <span className={s.active ? "text-status-ok group-hover:text-base0d" : "text-base04 group-hover:text-base0d"}>{s.active ? "x" : " "}</span>
                       <span className="text-base05">]</span>
                     </button>
                     <span className={s.active ? "text-base05" : "text-base04 line-through"}>{s.handle}</span>
@@ -678,7 +678,7 @@ export default function AccountDetailPage() {
                 />
                 <span className="text-base05">]</span>
                 <button type="button" onClick={handleAddSeed} className="group cursor-pointer">
-                  <Bracket className="text-base0e group-hover:text-base05">add</Bracket>
+                  <Bracket className="text-base0d group-hover:text-base05">add</Bracket>
                 </button>
                 {seedMsg && <span className="text-status-error">{seedMsg}</span>}
               </div>
@@ -690,7 +690,7 @@ export default function AccountDetailPage() {
                 value={settings.topics ?? ""}
                 onChange={(e) => setSettings((s) => ({ ...s, topics: e.target.value || null }))}
                 onBlur={() => setSettings((s) => ({ ...s, topics: normalizeList(s.topics, "topics") }))}
-                className="w-full bg-transparent border border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
+                className="w-full bg-transparent border border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d p-2 font-mono transition-colors resize-y break-words whitespace-pre-wrap"
               />
             </div>
           </div>
@@ -701,15 +701,15 @@ export default function AccountDetailPage() {
           <button
             type="submit"
             disabled={saving || !settingsLoaded}
-            className="group disabled:opacity-50 transition-colors bg-base11 border border-base03 px-2 py-0.5"
+            className="group disabled:opacity-50 transition-colors bg-base11 border border-base02 px-2 py-0.5"
           >
-            <Bracket className="text-base0e group-hover:text-base05">
+            <Bracket className="text-base0d group-hover:text-base05">
               {saving ? "saving…" : "save settings"}
             </Bracket>
           </button>
           {loadError && <span className="text-status-bad">{loadError}</span>}
           {msg && <span className="text-status-ok">{msg}</span>}
-          <button type="button" onClick={handleDelete} className="group transition-colors ml-auto bg-base11 border border-base03 px-2 py-0.5">
+          <button type="button" onClick={handleDelete} className="group transition-colors ml-auto bg-base11 border border-base02 px-2 py-0.5">
             <Bracket className="text-base04 group-hover:text-status-bad">delete account</Bracket>
           </button>
         </div>

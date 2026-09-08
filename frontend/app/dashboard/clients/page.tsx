@@ -50,7 +50,7 @@ function platformLabel(system_type: string): string {
   return system_type === "linux" ? "linux" : system_type === "macos" ? "macos" : "windows";
 }
 
-const sectionCls = "border border-base03 bg-base01";
+const sectionCls = "border border-base02 bg-base01";
 
 function statusColor(status: string): string {
   if (status === "activated") return "text-status-ok";
@@ -89,14 +89,14 @@ function BuildForm({
   const canSubmit = !submitting;
 
   return (
-    <div className="px-4 py-3 bg-base02 border-t border-base03">
+    <div className="px-4 py-3 bg-base02 border-t border-base02">
       <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
         <BracketInput label="client name" value={cfg.client_name} onChange={(v) => set("client_name", v.slice(0, 15))} width="15ch" placeholder="my laptop" />
         {(Object.keys(PLATFORM_LABELS) as Platform[]).map((platform) => (
           <button
             key={platform}
             onClick={() => switchPlatform(platform)}
-            className={`cursor-pointer transition-colors ${cfg.system_type === platform ? "text-base0e" : "text-base04 hover:text-white"}`}
+            className={`cursor-pointer transition-colors ${cfg.system_type === platform ? "text-base0d" : "text-base04 hover:text-white"}`}
           >
             <span className="text-base05">[</span>{PLATFORM_LABELS[platform]}<span className="text-base05">]</span>
           </button>
@@ -115,11 +115,11 @@ function BuildForm({
           <button
             onClick={() => onSubmit(cfg)}
             disabled={!canSubmit}
-            className="group cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-base11 border border-base03 px-2 py-0.5"
+            className="group cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-base11 border border-base02 px-2 py-0.5"
           >
-            <Bracket className="text-base0e group-hover:text-base05">{submitting ? "saving…" : submitLabel}</Bracket>
+            <Bracket className="text-base0d group-hover:text-base05">{submitting ? "saving…" : submitLabel}</Bracket>
           </button>
-          <button onClick={onCancel} className="group cursor-pointer transition-colors bg-base11 border border-base03 px-2 py-0.5">
+          <button onClick={onCancel} className="group cursor-pointer transition-colors bg-base11 border border-base02 px-2 py-0.5">
             <Bracket className="text-base04 group-hover:text-base05">cancel</Bracket>
           </button>
         </div>
@@ -354,7 +354,7 @@ export default function ClientPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base02">
+                <tr className="text-left text-base04 border-b border-base02 bg-base02">
                   <th className="px-3 py-2 font-normal whitespace-nowrap">client</th>
                   <th className="px-3 py-2 font-normal whitespace-nowrap">name</th>
                   <th className="px-3 py-2 font-normal whitespace-nowrap">platform</th>
@@ -371,7 +371,7 @@ export default function ClientPage() {
                   const isExpanded = expandedKey === build.id;
                   return (
                     <>
-                      <tr key={build.id} className="border-t border-base03 hover:bg-base02 transition-colors">
+                      <tr key={build.id} className="border-t border-base02 hover:bg-base02/60 transition-colors">
                         <td className="px-3 py-3 text-base05 whitespace-nowrap">#{String(build.client_id).padStart(2, "0")}</td>
                         <td className="px-3 py-3 text-base04 whitespace-nowrap">{cfg.client_name || "—"}</td>
                         <td className="px-3 py-3 text-base04 whitespace-nowrap">{platformLabel(cfg.system_type)}</td>
@@ -414,7 +414,7 @@ export default function ClientPage() {
                         </td>
                       </tr>
                       {isExpanded && (
-                        <tr key={`${build.id}-form`} className="border-t border-base03">
+                        <tr key={`${build.id}-form`} className="border-t border-base02">
                           <td colSpan={7} className="p-0">
                             <BuildForm
                               initial={cfg}
@@ -428,7 +428,7 @@ export default function ClientPage() {
                         </tr>
                       )}
                       {cfg.system_type === "linux" && expandedCmdsKey === build.id && cmdsByBuildId[build.id] && (
-                        <tr key={`${build.id}-cmds`} className="border-t border-base03">
+                        <tr key={`${build.id}-cmds`} className="border-t border-base02">
                           <td colSpan={7} className="p-0">
                             <div className="px-4 py-3 space-y-2 bg-base02">
                               <div className="grid gap-x-4 gap-y-1" style={{ gridTemplateColumns: "max-content 1fr" }}>
@@ -456,7 +456,7 @@ export default function ClientPage() {
                   const isExpanded = expandedKey === slotKey;
                   return (
                     <>
-                      <tr key={slotKey} className="border-t border-base03 hover:bg-base02 transition-colors">
+                      <tr key={slotKey} className="border-t border-base02 hover:bg-base02/60 transition-colors">
                         <td className="px-3 py-3 text-base03">#{String(slotNum).padStart(2, "0")}</td>
                         <td className="px-3 py-3 text-base03">—</td>
                         <td className="px-3 py-3 text-base03">—</td>
@@ -470,7 +470,7 @@ export default function ClientPage() {
                         </td>
                       </tr>
                       {isExpanded && (
-                        <tr key={`${slotKey}-form`} className="border-t border-base03">
+                        <tr key={`${slotKey}-form`} className="border-t border-base02">
                           <td colSpan={7} className="p-0">
                             <BuildForm
                               initial={DEFAULT_CONFIG}
@@ -488,7 +488,7 @@ export default function ClientPage() {
                 })}
 
                 {maxClients === 0 && !loading && (
-                  <tr className="border-t border-base03">
+                  <tr className="border-t border-base02">
                     <td colSpan={7} className="px-4 py-4 text-base04">No active subscription.</td>
                   </tr>
                 )}
@@ -499,7 +499,7 @@ export default function ClientPage() {
       </div>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 bg-base02">
+        <div className="px-4 py-2 border-b border-base02 bg-base02">
           <span className="text-base05">getting started</span>
         </div>
         <div className="px-4 py-4 space-y-4 text-base04">

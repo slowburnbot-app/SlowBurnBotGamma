@@ -14,7 +14,7 @@ const NOTICES_OPTIONS = [
   { value: "both", label: "both" },
 ];
 
-const sectionCls = "border border-base03 bg-base01";
+const sectionCls = "border border-base02 bg-base01";
 
 function formatPhone(raw: string): string {
   const d = raw.replace(/\D/g, "").slice(0, 10);
@@ -119,7 +119,7 @@ export default function ConfigPage() {
       <h1 className="font-semibold text-base05">Config</h1>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">session settings</div>
+        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">session settings</div>
 
         <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
           <BracketCheckbox label="Like Suggested" checked={likeSuggested} onChange={setLikeSuggested} />
@@ -143,18 +143,18 @@ export default function ConfigPage() {
       </div>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">notifications</div>
+        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">notifications</div>
 
         <div className="px-4 grid items-center gap-x-3" style={{ gridTemplateColumns: "14ch auto auto auto" }}>
-          <div className="py-2 border-b border-base03"><BracketCheckbox label="Session" checked={noticesSession} onChange={setNoticesSession} /></div>
-          <div className="py-2 border-b border-base03 inline-flex items-center gap-0 pr-5">
+          <div className="py-2 border-b border-base02"><BracketCheckbox label="Session" checked={noticesSession} onChange={setNoticesSession} /></div>
+          <div className="py-2 border-b border-base02 inline-flex items-center gap-0 pr-5">
             <span className="text-base04">{"type: "}</span>
             <span className="text-base05">{"["}</span>
             <Dropdown value={noticesType} onChange={(v) => setNoticesType(v)} placeholder="----" options={NOTICES_OPTIONS} />
             <span className="text-base05">{"]"}</span>
           </div>
-          <div className="py-2 border-b border-base03"><BracketInput label="email" value={notifyEmail} onChange={setNotifyEmail} type="email" placeholder="email@example.com" width="16ch" /></div>
-          <div className="py-2 border-b border-base03"><BracketInput label="phone" value={formatPhone(notifyPhone)} onChange={(v) => setNotifyPhone(stripPhone(v))} type="tel" placeholder="(123) 456-7890" width="14ch" /></div>
+          <div className="py-2 border-b border-base02"><BracketInput label="email" value={notifyEmail} onChange={setNotifyEmail} type="email" placeholder="email@example.com" width="16ch" /></div>
+          <div className="py-2 border-b border-base02"><BracketInput label="phone" value={formatPhone(notifyPhone)} onChange={(v) => setNotifyPhone(stripPhone(v))} type="tel" placeholder="(123) 456-7890" width="14ch" /></div>
 
           <div className="py-2"><BracketCheckbox label="Login/Error" checked={noticesLogin} onChange={setNoticesLogin} /></div>
           <div className="py-2 inline-flex items-center gap-0 pr-5">
@@ -169,20 +169,20 @@ export default function ConfigPage() {
       </div>
 
       <div className={sectionCls}>
-        <div className="px-4 py-2 border-b border-base03 text-base04 bg-base02">universal ignore</div>
+        <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">universal ignore</div>
 
         <div className="px-4 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
           <BracketCheckbox label="Skip Private Accounts" checked={skipPrivate} onChange={setSkipPrivate} />
         </div>
 
-        <div className="px-4 py-3 border-t border-base03">
+        <div className="px-4 py-3 border-t border-base02">
           <div className="text-base04 mb-1">skip/ignore account list</div>
           <textarea
             value={ignoreHandles}
             onChange={(e) => setIgnoreHandles(e.target.value)}
             placeholder="----"
             rows={9}
-            className="w-full bg-transparent text-base05 placeholder-base04 outline-none font-mono border border-base03 px-2 py-1 focus:border-base0e transition-colors resize-y"
+            className="w-full bg-transparent text-base05 placeholder-base04 outline-none font-mono border border-base02 px-2 py-1 focus:border-base0d transition-colors resize-y"
           />
         </div>
       </div>
@@ -191,9 +191,9 @@ export default function ConfigPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="group disabled:opacity-50 transition-colors bg-base11 border border-base03 px-2 py-0.5"
+          className="group disabled:opacity-50 transition-colors bg-base11 border border-base02 px-2 py-0.5"
         >
-          <Bracket className="text-base0e group-hover:text-base05">
+          <Bracket className="text-base0d group-hover:text-base05">
             {saving ? "saving…" : "save"}
           </Bracket>
         </button>

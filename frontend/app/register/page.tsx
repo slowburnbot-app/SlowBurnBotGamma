@@ -55,7 +55,7 @@ function RegisterForm() {
           value={inviteCode}
           onChange={(e) => setInviteCode(e.target.value)}
           required
-          className="flex-1 bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors"
+          className="flex-1 bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -66,7 +66,7 @@ function RegisterForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="flex-1 bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors"
+          className="flex-1 bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -78,7 +78,7 @@ function RegisterForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={8}
-          className="flex-1 bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors"
+          className="flex-1 bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -90,7 +90,7 @@ function RegisterForm() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
           minLength={8}
-          className="flex-1 bg-transparent border-b border-base03 text-base05 placeholder-base04 outline-none focus:border-base0e py-0.5 font-mono transition-colors"
+          className="flex-1 bg-transparent border-b border-base02 text-base05 placeholder-base04 outline-none focus:border-base0d py-0.5 font-mono transition-colors"
         />
       </div>
       <div className="flex items-center justify-between pt-1">
@@ -99,11 +99,11 @@ function RegisterForm() {
           disabled={loading}
           className="group disabled:opacity-50 transition-colors"
         >
-          <Bracket className="text-base0e group-hover:text-base05">
+          <Bracket className="text-base0d group-hover:text-base05">
             {loading ? "creating..." : "create account"}
           </Bracket>
         </button>
-        <Link href="/login" className="text-base04 hover:text-base0e transition-colors">
+        <Link href="/login" className="text-base04 hover:text-base0d transition-colors">
           ← sign in
         </Link>
       </div>
@@ -115,9 +115,9 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <div className="min-h-screen flex flex-col font-mono">
-      <div className="flex-1 max-w-5xl mx-auto w-full bg-base00 sm:border-x border-base03">
+      <div className="flex-1 max-w-5xl mx-auto w-full sm:border-x border-base02">
         <header className="px-3 sm:px-6 py-3">
-          <span className="font-semibold text-base0e">SlowBurnBot</span>
+          <span className="font-semibold text-base0d">SlowBurnBot</span>
         </header>
         <main className="px-3 sm:px-6 py-6">
           <Suspense fallback={<div className="text-base04">loading...</div>}>

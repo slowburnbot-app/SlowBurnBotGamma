@@ -67,7 +67,7 @@ export function Dropdown({
         <div
           ref={menuRef}
           style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
-          className="border border-base03 bg-base02 min-w-max text-left"
+          className="border border-base02 bg-base02 min-w-max text-left"
         >
           {options.map((opt) => (
             <div
@@ -75,7 +75,7 @@ export function Dropdown({
               onClick={() => { onChange(opt.value); setOpen(false); }}
               className={`px-3 py-1 cursor-pointer transition-colors font-mono ${
                 opt.value === value
-                  ? "bg-base0e text-base00"
+                  ? "bg-base0d text-base00"
                   : "text-base05 hover:bg-base11"
               }`}
             >

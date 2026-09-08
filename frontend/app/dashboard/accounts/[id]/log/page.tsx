@@ -69,7 +69,7 @@ export default function AccountLogPage() {
     const arrow = active ? (sortDir === "asc" ? "↑" : "↓") : "\u00a0";
     return (
       <th
-        className={`px-2 py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0e" : ""} ${className}`}
+        className={`px-2 py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0d" : ""} ${className}`}
         onClick={() => toggleSort(field)}
       >
         <span className="whitespace-nowrap">{label}<span className="inline-block w-[1em] text-center">{arrow}</span></span>
@@ -113,7 +113,7 @@ export default function AccountLogPage() {
         <span className="text-base04 ml-auto">[{total.toLocaleString()} entries]</span>
       </div>
 
-      <div className="border border-base03 bg-base01">
+      <div className="border border-base02 bg-base01">
         {loading ? (
           <p className="px-4 py-6 text-base04">loading...</p>
         ) : items.length === 0 ? (
@@ -122,7 +122,7 @@ export default function AccountLogPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base02">
+                <tr className="text-left text-base04 border-b border-base02 bg-base02">
                   <SortTh label="date" field="date" />
                   <SortTh label="run" field="run" />
                   <SortTh label="start" field="start" />
@@ -148,7 +148,7 @@ export default function AccountLogPage() {
                   const rowBg = altDay ? "bg-base02" : "";
                   return (
                   <>
-                    <tr key={entry.id} className={`hover:bg-base02 transition-colors border-t border-base03 ${rowBg}`}>
+                    <tr key={entry.id} className={`hover:bg-base02/60 transition-colors border-t border-base02 ${rowBg}`}>
                       <td className="px-2 py-1.5 text-base05 whitespace-nowrap">{entry.run_date ?? "—"}</td>
                       <td className="px-2 py-1.5 text-base04 whitespace-nowrap">{entry.run_sequence}</td>
                       <td className="px-2 py-1.5 text-base04 whitespace-nowrap">{fmtTime(entry.start_time)}</td>

@@ -60,8 +60,8 @@ export default function AdminRequestsPage() {
       <h1 className="font-semibold text-base05">admin — requests</h1>
       {msg && <p className="text-status-bad">{msg}</p>}
 
-      <div className="border border-base03 bg-base01">
-        <div className="border-b border-base03 px-4 py-2 bg-base02">
+      <div className="border border-base02 bg-base01">
+        <div className="border-b border-base02 px-4 py-2 bg-base02">
           <span className="text-base05">account requests</span>
           <span className="text-base04 ml-2">[{requests.length}]</span>
           {newCount > 0 && <span className="text-status-warning ml-2">{newCount} new</span>}
@@ -72,7 +72,7 @@ export default function AdminRequestsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-base04 border-b border-base03 bg-base02">
+                <tr className="text-left text-base04 border-b border-base02 bg-base02">
                   <th className="px-4 py-2 font-normal">date</th>
                   <th className="px-4 py-2 font-normal">name</th>
                   <th className="px-4 py-2 font-normal">email</th>
@@ -83,14 +83,14 @@ export default function AdminRequestsPage() {
                   <th className="px-4 py-2 font-normal"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-base03">
+              <tbody className="divide-y divide-base02">
                 {requests.map((req) => {
                   const isOpen = expanded === req.id;
                   const hasDetail = !!(req.instagram_handles || req.notes);
                   return (
                     <Fragment key={req.id}>
                       <tr
-                        className={`hover:bg-base02 transition-colors ${hasDetail ? "cursor-pointer" : ""}`}
+                        className={`hover:bg-base02/60 transition-colors ${hasDetail ? "cursor-pointer" : ""}`}
                         onClick={() => hasDetail && setExpanded(isOpen ? null : req.id)}
                       >
                         <td className="px-4 py-2 text-base04 whitespace-nowrap">
@@ -106,7 +106,7 @@ export default function AdminRequestsPage() {
                           <a
                             href={`mailto:${req.email}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="hover:text-base0e transition-colors"
+                            className="hover:text-base0d transition-colors"
                           >
                             {req.email}
                           </a>
