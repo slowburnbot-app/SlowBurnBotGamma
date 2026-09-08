@@ -199,37 +199,21 @@ export function Landing() {
         </header>
 
         <main className="px-3 sm:px-6 py-6 space-y-8">
-          <section className="space-y-3 max-w-3xl">
-            <h1 className="text-2xl sm:text-3xl text-base05 leading-snug">
-              grow your social presence —{" "}
-              <span className="text-base0d">steadily, consistently, and without the daily grind.</span>
-            </h1>
-            <p className="text-base04 leading-relaxed">
-              slowburnbot helps small businesses, agencies, and creators promote their social
-              profiles at a steady, sustainable pace. set your goals and your schedule once in a
-              clean web dashboard, then check back whenever you like to see how things are going.
-            </p>
-            <p className="text-base04 leading-relaxed">
-              built for people juggling more than one profile who want consistent, organic growth
-              without burning out — or burning through their audience&apos;s patience.
-            </p>
-          </section>
-
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-            <section className="lg:col-span-3 border border-base02 bg-base01">
-              <div className="border-b border-base02 px-4 py-2 bg-base02">
-                <span className="text-base05">what you get</span>
-              </div>
-              <ul className="divide-y divide-base02">
-                {HIGHLIGHTS.map(([title, body]) => (
-                  <li key={title} className="px-4 py-3 space-y-0.5">
-                    <div className="text-base05">
-                      <span className="text-base0d">*</span> {title}
-                    </div>
-                    <div className="text-base04 text-sm leading-relaxed">{body}</div>
-                  </li>
-                ))}
-              </ul>
+            <section className="lg:col-span-3 space-y-3">
+              <h1 className="text-2xl sm:text-3xl text-base05 leading-snug">
+                grow your social presence —{" "}
+                <span className="text-base0d">steadily, consistently, and without the daily grind.</span>
+              </h1>
+              <p className="text-base04 leading-relaxed">
+                slowburnbot helps small businesses, agencies, and creators promote their social
+                profiles at a steady, sustainable pace. set your goals and your schedule once in a
+                clean web dashboard, then check back whenever you like to see how things are going.
+              </p>
+              <p className="text-base04 leading-relaxed">
+                built for people juggling more than one profile who want consistent, organic growth
+                without burning out — or burning through their audience&apos;s patience.
+              </p>
             </section>
 
             <section id="sign-in" className="lg:col-span-2 border border-base02 bg-base01 scroll-mt-4">
@@ -241,6 +225,22 @@ export function Landing() {
               </div>
             </section>
           </div>
+
+          <section className="border border-base02 bg-base01">
+            <div className="border-b border-base02 px-4 py-2 bg-base02">
+              <span className="text-base05">what you get</span>
+            </div>
+            <ul className="divide-y divide-base02">
+              {HIGHLIGHTS.map(([title, body]) => (
+                <li key={title} className="px-4 py-3 space-y-0.5">
+                  <div className="text-base05">
+                    <span className="text-base0d">*</span> {title}
+                  </div>
+                  <div className="text-base04 text-sm leading-relaxed">{body}</div>
+                </li>
+              ))}
+            </ul>
+          </section>
 
           <section id="request" className="border border-base02 bg-base01 relative scroll-mt-4">
             <div className="border-b border-base02 px-4 py-2 bg-base02 flex items-center justify-between">
