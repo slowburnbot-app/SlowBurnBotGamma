@@ -325,7 +325,8 @@ export default function AccountDetailPage() {
                   placeholder="1"
                 />
                 <span className="text-base05">{"]"}</span>
-                <span className="text-base04 leading-none">{" + random: "}</span>
+                {/* NBSP: a plain leading space is trimmed at the start of a flex item */}
+                <span className="text-base04 leading-none">{"\u00A0+ random: "}</span>
                 <span className="text-base05">{"["}</span>
                 <NumberInput
                   value={settings.max_runs_random_per_day}
@@ -395,7 +396,8 @@ export default function AccountDetailPage() {
                   placeholder="60"
                 />
                 <span className="text-base05">{"]"}</span>
-                <span className="text-base04 leading-none">{" + random: "}</span>
+                {/* NBSP: a plain leading space is trimmed at the start of a flex item */}
+                <span className="text-base04 leading-none">{"\u00A0+ random: "}</span>
                 <span className="text-base05">{"["}</span>
                 <NumberInput
                   value={settings.delay_random_minutes}
@@ -424,7 +426,7 @@ export default function AccountDetailPage() {
                 <th className="px-4 py-2 font-normal">type</th>
                 <th className="px-4 py-2 font-normal">target</th>
                 <th className="px-4 py-2 font-normal w-28">fixed</th>
-                <th className="px-4 py-2 font-normal w-28">random</th>
+                <th className="px-4 py-2 font-normal w-28">+ random</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-base02">
@@ -484,6 +486,7 @@ export default function AccountDetailPage() {
                     </td>
                     <td className="px-4 py-2">
                       <span className="inline-flex items-center gap-0">
+                        <span className="text-base04">{"+\u00A0"}</span>
                         <span className="text-base05">{"["}</span>
                         <NumberInput
                           value={action.variable_count}

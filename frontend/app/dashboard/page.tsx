@@ -406,10 +406,10 @@ export default function DashboardPage() {
                 )}
                 {tab === "status" && (
                   <>
-                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Like</th>
-                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Follow</th>
-                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Unfollow</th>
-                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Status Page</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap min-w-[15ch]">Like</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap min-w-[15ch]">Follow</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap min-w-[15ch]">Unfollow</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap min-w-[15ch]">Status Page</th>
                   </>
                 )}
                 <th className="px-[4px] py-2 font-normal w-full text-right whitespace-nowrap">

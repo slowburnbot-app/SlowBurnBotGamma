@@ -46,9 +46,11 @@ export function ActionLimitBadges({ limits }: { limits: ActionLimit[] | undefine
 export function LimitCell({ limits, verb }: { limits: ActionLimit[] | undefined; verb: string }) {
   const active = limits?.find((l) => l.action === verb);
   if (!active) return <>ok</>;
+  // The cooldown end alone (13ch) fits the fixed 15ch status columns; "until" is in the tooltip.
+  const until = fmtLimitUntil(active.until);
   return (
-    <span className="text-status-warning" title={`${active.reason || active.tier} (strike ${active.strike})`}>
-      {`until ${fmtLimitUntil(active.until)}`}
+    <span className="text-status-warning" title={`limited until ${until} — ${active.reason || active.tier} (strike ${active.strike})`}>
+      {until}
     </span>
   );
 }
