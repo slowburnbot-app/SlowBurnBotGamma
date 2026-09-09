@@ -144,7 +144,7 @@ export default function AccountsPage() {
     const arrow = active ? (sortDir === "asc" ? "↑" : "↓") : "\u00a0";
     return (
       <th
-        className={`px-[6px] py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0d" : ""} ${className}`}
+        className={`px-[4px] py-2 font-normal cursor-pointer select-none transition-colors hover:text-base05 ${active ? "text-base0d" : ""} ${className}`}
         onClick={() => toggleSort(field)}
       >
         <span className="whitespace-nowrap">{label}<span className="inline-block w-[1em] text-center">{arrow}</span></span>
@@ -266,10 +266,10 @@ export default function AccountsPage() {
                 {tab === "settings" && (
                   <>
                     <SortTh label="Client" field="group" />
-                    <th className="px-[6px] py-2 font-normal">Schedule</th>
-                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Actions</th>
-                    <th className="px-[6px] py-2 font-normal">Delay</th>
-                    <th className="px-[6px] py-2 font-normal">Runs/Day</th>
+                    <th className="px-[4px] py-2 font-normal">Schedule</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Actions</th>
+                    <th className="px-[4px] py-2 font-normal">Delay</th>
+                    <th className="px-[4px] py-2 font-normal">Runs/Day</th>
                   </>
                 )}
                 {tab === "activity" && (
@@ -300,13 +300,13 @@ export default function AccountsPage() {
                 )}
                 {tab === "status" && (
                   <>
-                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Like</th>
-                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Follow</th>
-                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Unfollow</th>
-                    <th className="px-[6px] py-2 font-normal whitespace-nowrap">Status Page</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Like</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Follow</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Unfollow</th>
+                    <th className="px-[4px] py-2 font-normal whitespace-nowrap">Status Page</th>
                   </>
                 )}
-                <th className="px-[6px] py-2 font-normal w-full text-right whitespace-nowrap">
+                <th className="px-[4px] py-2 font-normal w-full text-right whitespace-nowrap">
                   {tab === "activity" && (
                     <span className="inline-flex items-center gap-0">
                       <span className="text-base04">{"activity:\u00a0 "}</span>
@@ -341,7 +341,7 @@ export default function AccountsPage() {
                 const fb = fbMap[account.id];
                 return (
                   <tr key={account.id} className={`hover:bg-base02/60 transition-colors ${account.system_disabled ? "text-base03" : account.enabled ? "text-base05" : "text-base04"}`}>
-                    <td className="px-[6px] py-2 whitespace-nowrap">
+                    <td className="px-[4px] py-2 whitespace-nowrap">
                       {account.system_disabled ? (
                         <Bracket className="text-base03">-</Bracket>
                       ) : (
@@ -355,65 +355,65 @@ export default function AccountsPage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-2 pr-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: "20ch" }}>
+                    <td className="px-2 pr-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: "18ch" }}>
                       {account.name}
                       {account.action_limits?.length > 0 && <> <ActionLimitBadges limits={account.action_limits} /></>}
                     </td>
                     {tab === "settings" && (
                       <>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtGroup(account.group_number)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtGroup(account.group_number)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">
                           {scheduleLabel(settingsMap[account.id])}
                         </td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">
+                        <td className="px-[4px] py-2 whitespace-nowrap">
                           {actionSlots(settingsMap[account.id], account)}
                         </td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">
+                        <td className="px-[4px] py-2 whitespace-nowrap">
                           {settingsMap[account.id] ? `${settingsMap[account.id].delay_base_minutes ?? 0}+${settingsMap[account.id].delay_random_minutes ?? 0}` : "—"}
                         </td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">
+                        <td className="px-[4px] py-2 whitespace-nowrap">
                           {settingsMap[account.id] ? `${settingsMap[account.id].max_runs_per_day ?? 0}+${settingsMap[account.id].max_runs_random_per_day ?? 0}` : "—"}
                         </td>
                       </>
                     )}
                     {tab === "activity" && (
                       <>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(log?.sessions)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(log?.likes)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(log?.follows)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(log?.unfollows)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(log?.sessions)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(log?.likes)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(log?.follows)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(log?.unfollows)}</td>
                       </>
                     )}
                     {tab === "stats" && (() => {
                       const daily = fb?.days && fb?.followed_back != null ? (fb.followed_back / fb.days).toFixed(1) : "----";
                       return (
                         <>
-                          <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(fb?.complete)}</td>
-                          <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(fb?.followed_back)}</td>
-                          <td className="px-[6px] py-2 whitespace-nowrap">{fmtPct(fb?.rate ?? null)}</td>
-                          <td className="px-[6px] py-2 whitespace-nowrap">{daily}</td>
+                          <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(fb?.complete)}</td>
+                          <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(fb?.followed_back)}</td>
+                          <td className="px-[4px] py-2 whitespace-nowrap">{fmtPct(fb?.rate ?? null)}</td>
+                          <td className="px-[4px] py-2 whitespace-nowrap">{daily}</td>
                         </>
                       );
                     })()}
                     {tab === "database" && (
                       <>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.following)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.unfollow_ready)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.complete)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.ignored)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.total)}</td>
-                        <td className="px-[6px] py-2 whitespace-nowrap">{fmtNum(stats?.success)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(stats?.following)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(stats?.unfollow_ready)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(stats?.complete)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(stats?.ignored)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(stats?.total)}</td>
+                        <td className="px-[4px] py-2 whitespace-nowrap">{fmtNum(stats?.success)}</td>
                       </>
                     )}
                     {tab === "status" && (
                       <>
-                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="like" /></td>
-                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="follow" /></td>
-                        <td className="px-[6px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="unfollow" /></td>
-                        <td className="px-[6px] py-2 whitespace-nowrap"><StatusPageCell account={account} /></td>
+                        <td className="px-[4px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="like" /></td>
+                        <td className="px-[4px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="follow" /></td>
+                        <td className="px-[4px] py-2 whitespace-nowrap"><LimitCell limits={account.action_limits} verb="unfollow" /></td>
+                        <td className="px-[4px] py-2 whitespace-nowrap"><StatusPageCell account={account} /></td>
                       </>
                     )}
-                    <td className="px-[6px] py-2 text-right">
+                    <td className="px-[4px] py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {tab === "settings" && (
                           <Link href={`/dashboard/accounts/${account.id}`} className="group font-mono transition-colors">

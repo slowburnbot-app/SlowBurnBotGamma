@@ -13,7 +13,18 @@ export function formatTime(t: string | null | undefined): string {
 }
 
 /**
- * Build a condensed schedule label: "daily 09:00AM-10:00PM 3/day"
+ * Compact form for table cells: "9AM" when the minutes are zero, else "9:30PM".
+ * The settings page inputs keep formatTime (their parser expects "HH:MMAM").
+ */
+export function formatTimeShort(t: string | null | undefined): string {
+  const full = formatTime(t);
+  const match = full.match(/^0?(\d{1,2}):(\d{2})(AM|PM)$/);
+  if (!match) return full;
+  return match[2] === "00" ? `${match[1]}${match[3]}` : `${match[1]}:${match[2]}${match[3]}`;
+}
+
+/**
+ * Build a condensed schedule label: "daily 9AM-10PM"
  */
 export function scheduleLabel(s: {
   schedule_days?: string | null;
@@ -25,7 +36,7 @@ export function scheduleLabel(s: {
   const parts: string[] = [];
   if (s.schedule_days) parts.push(s.schedule_days);
   if (s.schedule_start || s.schedule_end) {
-    parts.push(`${formatTime(s.schedule_start)}-${formatTime(s.schedule_end)}`);
+    parts.push(`${formatTimeShort(s.schedule_start)}-${formatTimeShort(s.schedule_end)}`);
   }
   return parts.length ? parts.join(" ") : "—";
 }

@@ -36,15 +36,16 @@ export function ActionLimitBadges({ limits }: { limits: ActionLimit[] | undefine
 }
 
 /**
- * One "account status" table cell for a verb: "no limits" in the ok colour, or
- * "until 09/07 02:14PM" in the warning colour. Plain text, no brackets: on this
- * dashboard [ ] marks a link or an input, and these cells are read-only. The
- * strike count and the reason are in the tooltip and on the per-account status
- * page, not in the table, so the 4 status columns fit the accounts box.
+ * One "account status" table cell for a verb. Same conventions as the other
+ * views of the accounts table: "ok" for no active limit, plain text in the
+ * row's own colour, no brackets (on this dashboard [ ] marks a
+ * link or an input). Only an active limit is coloured, in the warning colour,
+ * like the badge next to the account name. The strike count and the reason
+ * are in the tooltip and on the per-account status page.
  */
 export function LimitCell({ limits, verb }: { limits: ActionLimit[] | undefined; verb: string }) {
   const active = limits?.find((l) => l.action === verb);
-  if (!active) return <span className="text-status-ok">no limits</span>;
+  if (!active) return <>ok</>;
   return (
     <span className="text-status-warning" title={`${active.reason || active.tier} (strike ${active.strike})`}>
       {`until ${fmtLimitUntil(active.until)}`}
@@ -52,16 +53,15 @@ export function LimitCell({ limits, verb }: { limits: ActionLimit[] | undefined;
   );
 }
 
-/** The "status page" table cell: "clean 09/07" (full check time in the tooltip), or "------" when never read. */
+/** The "status page" table cell: "clean 09/07" in the row colour, a flagged result in the warning colour, "----" when never read. */
 export function StatusPageCell({ account }: { account: Account }) {
-  if (!account.status_page_checked_at) return <span className="text-base04">------</span>;
+  if (!account.status_page_checked_at) return <>----</>;
   const checked = fmtLimitUntil(account.status_page_checked_at);
+  const clean = account.status_page_result === "clean";
   return (
     <span title={`checked ${checked}`}>
-      <span className={account.status_page_result === "clean" ? "text-status-ok" : "text-status-warning"}>
-        {account.status_page_result ?? "?"}
-      </span>
-      <span className="text-base04">{` ${checked.slice(0, 5)}`}</span>
+      <span className={clean ? "" : "text-status-warning"}>{account.status_page_result ?? "?"}</span>
+      {` ${checked.slice(0, 5)}`}
     </span>
   );
 }
