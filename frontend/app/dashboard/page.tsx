@@ -596,7 +596,7 @@ export default function DashboardPage() {
                   }
                   return recentLog.map((entry) => {
                   const altDay = (dayGroups.get(entry.run_date ?? "") ?? 0) % 2 === 1;
-                  const rowBg = altDay ? "bg-base02" : "";
+                  const rowBg = altDay ? "bg-base02/15" : "";
                   return (
                   <>
                   <tr key={entry.id} className={`hover:bg-base02/60 transition-colors border-t border-base02 ${rowBg}`}>
