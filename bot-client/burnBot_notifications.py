@@ -175,7 +175,7 @@ def send_action_limit_alert(account, action, tier, reason, until=None, strike=No
         _print(client_log_line(account, "notify", f"Failed to send action limit alert: {e}"))
 
 
-def send_captcha_challenge_alert(account, novnc_url, run_count=0, max_runs=0, apiClient=None, account_id=None, _print=None):
+def send_captcha_challenge_alert(account, novnc_url, run_count=0, max_runs=0, apiClient=None, account_id=None, _print=None, timeout_seconds=None):
     """Send an action-required alert when Instagram serves a CAPTCHA challenge during login."""
     if _print is None:
         _print = builtins.print
@@ -192,21 +192,24 @@ def send_captcha_challenge_alert(account, novnc_url, run_count=0, max_runs=0, ap
             return
 
         run_info = f"run {run_count}/{max_runs}" if max_runs > 0 else f"run {run_count}"
+        deadline = f" within {timeout_seconds // 60} minutes" if timeout_seconds else ""
         body = (
             f"CAPTCHA Challenge — Action Required ({run_info})\n\n"
             f"Account: {account}\n\n"
             f"Instagram is showing a CAPTCHA challenge. Open the link below in your browser "
-            f"to view and solve it, then type 'done' in the bot terminal.\n\n"
+            f"to view and solve it, then type 'done' in the bot terminal{deadline}. "
+            f"If it is not solved in time, this login attempt fails and the bot moves on.\n\n"
             f"Browser: {novnc_url}"
         )
-        sms_summary = f"{account} - CAPTCHA REQUIRED\nOpen the remote view link in your email to solve"
+        sms_deadline = f" within {timeout_seconds // 60} min" if timeout_seconds else ""
+        sms_summary = f"{account} - CAPTCHA REQUIRED\nOpen the remote view link in your email to solve{sms_deadline}"
         subject = f"SlowBurnBot CAPTCHA Challenge - {account}"
         _dispatch(account, login_type, login_email, login_phone, subject, body, sms_summary, apiClient, account_id=account_id, _print=_print)
     except Exception as e:
         _print(client_log_line(account, "notify", f"Failed to send CAPTCHA alert: {e}"))
 
 
-def send_sms_challenge_alert(account, run_count=0, max_runs=0, apiClient=None, account_id=None, _print=None):
+def send_sms_challenge_alert(account, run_count=0, max_runs=0, apiClient=None, account_id=None, _print=None, timeout_seconds=None):
     """Send an action-required alert when Instagram requests an SMS verification code during login."""
     if _print is None:
         _print = builtins.print
@@ -223,13 +226,16 @@ def send_sms_challenge_alert(account, run_count=0, max_runs=0, apiClient=None, a
             return
 
         run_info = f"run {run_count}/{max_runs}" if max_runs > 0 else f"run {run_count}"
+        deadline = f" within {timeout_seconds // 60} minutes" if timeout_seconds else ""
         body = (
             f"SMS Verification Required — Action Required ({run_info})\n\n"
             f"Account: {account}\n\n"
             f"Instagram is requesting an SMS verification code. "
-            f"Enter the code in the bot terminal to continue."
+            f"Enter the code in the bot terminal{deadline} to continue. "
+            f"If the code is not entered in time, this login attempt fails and the bot moves on."
         )
-        sms_summary = f"{account} - SMS CODE REQUIRED\nEnter the code in the bot terminal"
+        sms_deadline = f" within {timeout_seconds // 60} min" if timeout_seconds else ""
+        sms_summary = f"{account} - SMS CODE REQUIRED\nEnter the code in the bot terminal{sms_deadline}"
         subject = f"SlowBurnBot SMS Verification - {account}"
         _dispatch(account, login_type, login_email, login_phone, subject, body, sms_summary, apiClient, account_id=account_id, _print=_print)
     except Exception as e:

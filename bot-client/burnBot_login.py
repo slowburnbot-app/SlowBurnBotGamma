@@ -249,6 +249,13 @@ def dismiss_notifications_prompt(driver, context_label="login"):
     return False
 
 
+# How long the TUI waits for the operator to answer an SMS-code or CAPTCHA
+# prompt before it gives up on this login attempt and lets the client move on
+# to the next scheduled account. CAPTCHA gets longer because solving one takes
+# more time than copying a text code.
+SMS_CODE_INPUT_TIMEOUT_SECONDS = 180
+CAPTCHA_INPUT_TIMEOUT_SECONDS = 300
+
 # Instagram shows this interstitial ("Save your login info?") at /accounts/onetap/
 # immediately AFTER a successful login. Its presence is a positive login signal.
 INSTAGRAM_ONETAP_URL_FRAGMENT = "/accounts/onetap"
@@ -1292,12 +1299,19 @@ def do_login(driver, username, password, apiClient=None):
                     # Send notification so customer knows action is required
                     try:
                         from burnBot_notifications import send_captcha_challenge_alert
-                        send_captcha_challenge_alert(username, novnc_url, apiClient=apiClient, _print=print)
+                        send_captcha_challenge_alert(username, novnc_url, apiClient=apiClient, _print=print, timeout_seconds=CAPTCHA_INPUT_TIMEOUT_SECONDS)
                     except Exception:
                         pass
 
                     # Pause bot thread — TUI shows short prompt in input field
-                    status_store.request_operator_input("Type 'done' after solving CAPTCHA:")
+                    _captcha_input = status_store.request_operator_input(
+                        "Type 'done' after solving CAPTCHA:", timeout=CAPTCHA_INPUT_TIMEOUT_SECONDS
+                    )
+                    if not _captcha_input:
+                        print(client_log_line(
+                            username, "login",
+                            f"CAPTCHA prompt cancelled or not answered within {CAPTCHA_INPUT_TIMEOUT_SECONDS}s — checking page state",
+                        ))
 
                     # Verify page state after operator confirms — don't navigate, check in place
                     try:
@@ -1531,10 +1545,12 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                 ))
                 try:
                     from burnBot_notifications import send_sms_challenge_alert
-                    send_sms_challenge_alert(account, apiClient=apiClient, _print=print)
+                    send_sms_challenge_alert(account, apiClient=apiClient, _print=print, timeout_seconds=SMS_CODE_INPUT_TIMEOUT_SECONDS)
                 except Exception as _sms_notif_err:
                     print(client_log_line(account, "notify", f"Warning — SMS challenge alert failed: {_sms_notif_err}"))
-                sms_code = status_store.request_operator_input(f"SMS code for @{account}:")
+                sms_code = status_store.request_operator_input(
+                    f"SMS code for @{account}:", timeout=SMS_CODE_INPUT_TIMEOUT_SECONDS
+                )
                 if sms_code.strip():
                     print(client_log_line(account, "login", "SMS code received — submitting to Instagram"))
                     is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip(), account=account)
@@ -1544,7 +1560,10 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                         verification_requested = True
                         break
                 else:
-                    print(client_log_line(account, "login", "SMS code entry cancelled"))
+                    print(client_log_line(
+                        account, "login",
+                        f"SMS code entry cancelled or not entered within {SMS_CODE_INPUT_TIMEOUT_SECONDS}s",
+                    ))
                     loginFailureExit = True
                     verification_requested = True
                     break
@@ -1570,10 +1589,12 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                     ))
                     try:
                         from burnBot_notifications import send_sms_challenge_alert
-                        send_sms_challenge_alert(account, apiClient=apiClient, _print=print)
+                        send_sms_challenge_alert(account, apiClient=apiClient, _print=print, timeout_seconds=SMS_CODE_INPUT_TIMEOUT_SECONDS)
                     except Exception as _sms_notif_err:
                         print(client_log_line(account, "notify", f"Warning — SMS challenge alert failed: {_sms_notif_err}"))
-                    sms_code = status_store.request_operator_input(f"SMS code for @{account}:")
+                    sms_code = status_store.request_operator_input(
+                        f"SMS code for @{account}:", timeout=SMS_CODE_INPUT_TIMEOUT_SECONDS
+                    )
                     if sms_code.strip():
                         print(client_log_line(account, "login", "SMS code received — submitting to Instagram"))
                         is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip(), account=account)
@@ -1583,7 +1604,10 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                             verification_requested = True
                             break
                     else:
-                        print(client_log_line(account, "login", "SMS code entry cancelled"))
+                        print(client_log_line(
+                            account, "login",
+                            f"SMS code entry cancelled or not entered within {SMS_CODE_INPUT_TIMEOUT_SECONDS}s",
+                        ))
                         loginFailureExit = True
                         verification_requested = True
                         break

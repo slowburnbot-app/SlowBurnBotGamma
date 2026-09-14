@@ -126,10 +126,12 @@ def get_pending_command():
         return cmd
 
 
-def request_operator_input(prompt: str) -> str:
+def request_operator_input(prompt: str, timeout: float | None = None) -> str:
     """
     Block the calling (bot) thread until the operator submits input via the TUI.
-    Returns the submitted string, or "" if cancelled or no TUI is available.
+    Returns the submitted string, or "" if cancelled, timed out, or no TUI is
+    available. If `timeout` (seconds) elapses with no response, the input bar
+    is restored to normal command mode so it does not sit stuck on the prompt.
     """
     global _pending_input_prompt, _pending_input_value
     if _app is None:
@@ -139,7 +141,12 @@ def request_operator_input(prompt: str) -> str:
         _pending_input_value = None
         _pending_input_event.clear()
     _app.call_from_thread(_app._enter_input_prompt_mode, prompt)
-    _pending_input_event.wait()
+    answered = _pending_input_event.wait(timeout)
+    if not answered:
+        with _lock:
+            _pending_input_prompt = None
+        _app.call_from_thread(_app._exit_input_prompt_mode)
+        return ""
     with _lock:
         return _pending_input_value or ""
 
