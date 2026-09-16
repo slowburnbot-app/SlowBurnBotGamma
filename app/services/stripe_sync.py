@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.subscription import Subscription
 from app.models.user import User
 from app.plan_tiers import is_valid_tier
+from app.services.admin_notify import notify_admin
 from app.services.plan_enforcement import enforce_account_limits
 from app.settings import settings
 
@@ -157,6 +158,7 @@ async def apply_stripe_subscription(
         )
         return sub
 
+    previous_status = sub.status
     sub.stripe_subscription_id = stripe_sub.id
     sub.stripe_customer_id = stripe_sub.customer
     sub.status = incoming_status
@@ -183,6 +185,20 @@ async def apply_stripe_subscription(
         if user is not None:
             user.plan_tier = tier
         await enforce_account_limits(sub.user_id, session)
+        if previous_status != "active" and incoming_status == "active":
+            end = sub.current_period_end
+            await notify_admin(
+                "account activated via Stripe",
+                [
+                    "A Stripe subscription became active.",
+                    "",
+                    f"email:        {user.email if user is not None else sub.user_id}",
+                    f"plan tier:    {sub.plan_tier}",
+                    f"stripe sub:   {stripe_sub.id}",
+                    f"period ends:  {end.strftime('%Y-%m-%d %H:%M UTC') if end else '----'}",
+                ],
+                session,
+            )
     else:
         # Price id didn't map to a known tier (env drift / new Stripe price /
         # misconfigured settings). Leaving plan_tier untouched while status

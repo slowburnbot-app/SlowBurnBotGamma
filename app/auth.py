@@ -167,6 +167,22 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             session.add(subscription)
             await session.commit()
 
+            from app.services.admin_notify import notify_admin
+
+            lines = [
+                "A new account was created.",
+                "",
+                f"email:        {user.email}",
+                f"invite code:  {invite.code if invite else '----'}",
+                f"plan tier:    {plan_tier}",
+                f"status:       {sub_status}",
+                f"trial days:   {invite.free_trial_days if invite and invite.free_trial_days else '----'}",
+                f"trial ends:   {period_end.strftime('%Y-%m-%d %H:%M UTC') if period_end else '----'}",
+                "",
+                "Review at /admin/users.",
+            ]
+            await notify_admin("new account created", lines, session)
+
 
 async def get_user_manager(user_db=Depends(get_user_db)):
     yield UserManager(user_db)

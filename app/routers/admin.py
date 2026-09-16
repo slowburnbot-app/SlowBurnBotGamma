@@ -24,6 +24,7 @@ from app.models.user import User
 from app.plan_tiers import is_valid_tier
 from app.schemas.admin import NotificationCredentialsRead, NotificationCredentialsUpdate
 from app.schemas.theme import ThemeCreate, ThemeRead
+from app.services.admin_notify import notify_admin
 from app.services.email import send_invite_email
 from app.services.plan_enforcement import enforce_account_limits
 from app.services.stripe_sync import apply_stripe_subscription
@@ -139,6 +140,20 @@ async def activate_subscription(
 
     await enforce_account_limits(user_id, session)
     await session.commit()
+
+    end = sub.current_period_end
+    await notify_admin(
+        "account activated by admin",
+        [
+            "An admin activated an account.",
+            "",
+            f"email:        {user.email if user else user_id}",
+            f"plan tier:    {sub.plan_tier}",
+            f"status:       {sub.status}",
+            f"trial ends:   {end.strftime('%Y-%m-%d %H:%M UTC') if end else '----'}",
+        ],
+        session,
+    )
     return {
         "status": sub.status,
         "plan_tier": sub.plan_tier,

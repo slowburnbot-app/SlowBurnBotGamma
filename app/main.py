@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -13,6 +14,7 @@ from app.models.system_config import SystemConfig
 from app.routers import accounts, admin, auth_refresh, bot, config, desktop_builds, public, subscription, themes, webhooks
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.services import github_actions, object_storage
+from app.services.trial_expiry import TRIAL_EXPIRY_CHECK_SECONDS, notify_expired_trials
 from app.settings import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -72,11 +74,23 @@ async def _sync_bot_version() -> None:
         logging.warning(f"Startup bot version sync failed: {e}")
 
 
+async def _trial_expiry_loop() -> None:
+    """Run the trial-expiry check once at startup, then once per hour."""
+    while True:
+        try:
+            await notify_expired_trials()
+        except Exception as e:
+            logging.warning(f"Trial expiry check failed: {e}")
+        await asyncio.sleep(TRIAL_EXPIRY_CHECK_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _sync_bot_version()
     await _prune_expired_access_tokens()
+    task = asyncio.create_task(_trial_expiry_loop())
     yield
+    task.cancel()
 
 
 app = FastAPI(

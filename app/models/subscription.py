@@ -23,6 +23,8 @@ class Subscription(Base):
     plan_tier: Mapped[str] = mapped_column(String(50), default="free")
     current_period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when the admin got the "trial expired" email, so it is sent once.
+    trial_expiry_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
