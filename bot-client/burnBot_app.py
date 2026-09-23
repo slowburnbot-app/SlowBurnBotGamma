@@ -57,6 +57,17 @@ class DefaultBgRichLog(RichLog):
     def render_lines(self, crop):
         return [self._strip_default_bg(strip) for strip in super().render_lines(crop)]
 
+
+class AccountsTable(DataTable):
+    """DataTable for the account rows. It asks the app to refit Last Action when its own size changes.
+
+    The app gets its Resize event before the table has its new size, so the refit hooks the table's event.
+    """
+
+    def on_resize(self, _event) -> None:
+        self.app.call_after_refresh(self.app._fit_last_action_column)
+
+
 import burnBot_status as status_store
 from burnBot_client_log import client_log_line
 from burnBot_accountSession_setup import launch_manual_browser
@@ -382,7 +393,7 @@ class BurnBotApp(App):
                     row.append(desc, style=p["dim"])
                     yield Static(row)
             yield Static("", id="help-hint-inline")
-        yield DataTable(id="accounts", show_cursor=False)
+        yield AccountsTable(id="accounts", show_cursor=False)
         with Horizontal(id="vnc-bar"):
             yield Static("", id="vnc-info")
             yield Static("[", id="vnc-bracket-l")
@@ -437,6 +448,7 @@ class BurnBotApp(App):
         inp.focus()
         self.call_after_refresh(self._deselect_input)
         self.call_after_refresh(self._update_ghost)
+        self.call_after_refresh(self._fit_last_action_column)
         status_store.flush_log_buffer(self)
         threading.Thread(target=self._bot_loop_fn, daemon=True).start()
 
@@ -818,6 +830,32 @@ class BurnBotApp(App):
                 )
             except Exception:
                 pass
+        # Other columns auto-size after this update, so fit Last Action after the refresh
+        self.call_after_refresh(self._fit_last_action_column)
+
+    def _fit_last_action_column(self) -> None:
+        """Widen Last Action to fill the table width that the other columns leave (minimum 40)."""
+        try:
+            table = self.query_one("#accounts", DataTable)
+        except Exception:
+            return
+        last_action = None
+        other_width = 0
+        for column in table.columns.values():
+            if column.key.value == "last_action":
+                last_action = column
+            else:
+                other_width += column.get_render_width(table)
+        if last_action is None:
+            return
+        available = table.scrollable_content_region.width - other_width - 2 * table.cell_padding
+        width = max(40, available)
+        if width != last_action.width:
+            # DataTable has no public API to resize a column; these are the steps it uses internally
+            last_action.width = width
+            table._require_update_dimensions = True
+            table._clear_caches()
+            table.refresh()
 
     def _refresh_all_account_rows(self) -> None:
         """Re-render all account rows with the current palette's status colors."""
