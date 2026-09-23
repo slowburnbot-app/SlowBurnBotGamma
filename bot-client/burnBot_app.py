@@ -506,14 +506,12 @@ class BurnBotApp(App):
 
         header = Text(no_wrap=True)
         header.append("SlowBurnBot Client: ", style=f"bold {p['brand']}")
-        header.append(client_id_str, style=p["heading"])
         if self._client_name:
-            header.append(" [", style=p["heading"])
             header.append(self._client_name, style=p["accent"])
-            header.append("]", style=p["heading"])
+        header.append(f"[{client_id_str}]", style=p["heading"])
         header.append(" / ", style=p["heading"])
-        header.append(f"version {self._version}", style=p["heading"])
-        header.append(" [", style=p["heading"])
+        header.append(f"version[{self._version}]", style=p["heading"])
+        header.append("[", style=p["heading"])
         header.append(version_status, style=p["accent"])
         header.append("]", style=p["heading"])
 
