@@ -33,7 +33,8 @@ MODE_LABELS = {
 # accent       : active, focus, "running" status
 # brand        : app title highlight
 # warn         : amber / warning / initializing
-# wait         : yellow / waiting between runs
+# wait         : yellow / scheduled, between runs
+# orange       : orange / waiting (off-schedule)
 # error        : red / error / disabled
 # ghost        : autocomplete ghost text
 # on_accent    : text drawn on accent backgrounds (cursor foreground)
@@ -52,6 +53,7 @@ DEFAULT_PALETTE = {
     "brand":        "#d97757",
     "warn":         "#E5C07B",
     "wait":         "#E8E06A",
+    "orange":       "#E0904A",
     "error":        "#cf3b0a",
     "ghost":        "#4a4a45",
     "on_accent":    "#141413",
@@ -74,6 +76,7 @@ TERMINAL_INLINE = {
     "brand":        "magenta",
     "warn":         "yellow",
     "wait":         "bright_yellow",
+    "orange":       "color(208)",
     "error":        "red",
     "ghost":        "bright_black",
     "on_accent":    "black",
@@ -90,6 +93,7 @@ TERMINAL_CSS = {
     "brand":        "#cc00cc",    # approx ANSI magenta
     "warn":         "#cccc00",    # approx ANSI yellow
     "wait":         "#ffff55",    # approx ANSI bright yellow
+    "orange":       "#ff8700",    # approx 256-color 208
     "error":        "#cc0000",    # approx ANSI red
     "ghost":        "#444444",
     "on_accent":    "#000000",
@@ -112,6 +116,7 @@ _BASE24_TO_ROLE = {
     "brand":        "base0E",   # keywords/accent color
     "warn":         "base0A",   # yellow
     "wait":         "base13",   # bright yellow (base24 only)
+    "orange":       "base09",   # orange
     "error":        "base08",   # red
     "ghost":        "base03",   # comments
     "on_accent":    "base00",   # darkest background (readable on accent)
@@ -123,14 +128,14 @@ _BASE24_TO_ROLE = {
 _STATUS_TO_ROLE = {
     "running":         "accent",
     "initializing":    "warn",
-    "waiting":         "wait",
+    "scheduled":       "wait",
     "paused":          "warn",
     "max runs":        "warn",
     "disabled":        "error",
     "system-disabled": "error",
     "no schedule":     "error",
     "idle":            "dim",
-    "off-schedule":    "dim",
+    "waiting":         "orange",
 }
 
 

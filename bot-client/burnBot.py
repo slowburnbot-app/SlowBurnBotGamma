@@ -758,7 +758,7 @@ try:
                         status_store.update(account_name, **_restore)
 
             # Show status for all accounts, trigger active ones if it's time to run
-            _any_account_waiting = False  # Track if any account is in-schedule and waiting
+            _any_account_waiting = False  # Track if any account is in-schedule and scheduled for a next run
             for acct in all_accounts:
                 account_name = acct.get("name", "")
                 account_id = acct.get("id", "")
@@ -816,7 +816,7 @@ try:
                     _off_run_count = run_counter.get_run_count(account_name)
                     _off_smax = schedule.get('max', 0) or 0
                     _off_run_info = f"[{_off_run_count}/{int(_off_smax)}]" if _off_smax > 0 else f"[{_off_run_count}]"
-                    status_store.update(account_name, status="off-schedule", next_run="—", run_info=_off_run_info)
+                    status_store.update(account_name, status="waiting", next_run="—", run_info=_off_run_info)
                     account_next_run.pop(account_name, None)
                     continue
 
@@ -962,7 +962,7 @@ try:
                     run_count = run_counter.get_run_count(account_name)
                     schedule_max = account_schedules.get(account_name, {}).get('max', 0) or 0
                     run_info = f"[{run_count}/{int(schedule_max)}]" if schedule_max > 0 else f"[{run_count}]"
-                    status_store.update(account_name, status="waiting", next_run=next_run_str, run_info=run_info)
+                    status_store.update(account_name, status="scheduled", next_run=next_run_str, run_info=run_info)
                     _any_account_waiting = True
 
             # Send heartbeat — determine overall client status
