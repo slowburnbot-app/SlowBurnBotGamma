@@ -506,14 +506,17 @@ class BurnBotApp(App):
 
         header = Text(no_wrap=True)
         header.append("SlowBurnBot Client: ", style=f"bold {p['brand']}")
+        # Brackets and labels are dim so each value inside them stands out
+        status_role = {"current": "accent", "ahead": "wait", "behind": "error"}.get(version_status, "heading")
         if self._client_name:
             header.append(self._client_name, style=p["accent"])
-        header.append(f"[{client_id_str}]", style=p["heading"])
-        header.append(" / ", style=p["heading"])
-        header.append(f"version[{self._version}]", style=p["heading"])
-        header.append("[", style=p["heading"])
-        header.append(version_status, style=p["accent"])
-        header.append("]", style=p["heading"])
+        header.append("[", style=p["dim"])
+        header.append(client_id_str, style=p["heading"])
+        header.append("] / version[", style=p["dim"])
+        header.append(self._version, style=p["heading"])
+        header.append("][", style=p["dim"])
+        header.append(version_status, style=p[status_role])
+        header.append("]", style=p["dim"])
 
         self.query_one("#header-bar", Static).update(header)
 
