@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import {
   createDesktopBuild,
   revokeDesktopBuild,
+  rebuildDesktopBuild,
   listDesktopBuilds,
   getDownloadInfo,
   getDesktopBuildsMeta,
@@ -151,7 +152,11 @@ export default function ClientPage() {
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
 
-  const [justCreated, setJustCreated] = useState<DesktopBuildWithToken | null>(null);
+  // The server keeps only a hash of each token, so a token can be shown only in the
+  // session that made it. Anything not in this map shows as ****.
+  const [tokenByBuildId, setTokenByBuildId] = useState<Record<string, string>>({});
+  const [tokenPanelKey, setTokenPanelKey] = useState<string | null>(null);
+  const [replacingToken, setReplacingToken] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
 
   const [expandedCmdsKey, setExpandedCmdsKey] = useState<string | null>(null);
@@ -193,6 +198,23 @@ export default function ClientPage() {
   const maxClients = subInfo?.max_clients ?? 0;
   const emptySlotCount = Math.max(0, maxClients - activeBuilds.length);
 
+  function showToken(result: DesktopBuildWithToken) {
+    setTokenByBuildId((prev) => ({ ...prev, [result.id]: result.activation_token }));
+    setTokenPanelKey(result.id);
+  }
+
+  async function handleReplaceToken(buildId: string) {
+    setReplacingToken(buildId);
+    try {
+      showToken(await rebuildDesktopBuild(buildId));
+      await refreshAll();
+    } catch (e: unknown) {
+      setPageError(e instanceof Error ? e.message : "Replace token failed.");
+    } finally {
+      setReplacingToken(null);
+    }
+  }
+
   function toggleExpand(key: string) {
     setExpandedKey((prev) => prev === key ? null : key);
     setFormError(null);
@@ -203,7 +225,7 @@ export default function ClientPage() {
     setFormError(null);
     try {
       const result = await createDesktopBuild(cfg);
-      setJustCreated(result);
+      showToken(result);
       setExpandedKey(null);
       await refreshAll();
     } catch (e: unknown) {
@@ -219,7 +241,7 @@ export default function ClientPage() {
     try {
       await revokeDesktopBuild(buildId);
       const result = await createDesktopBuild(cfg, slotNumber);
-      setJustCreated(result);
+      showToken(result);
       setExpandedKey(null);
       await refreshAll();
     } catch (e: unknown) {
@@ -284,6 +306,7 @@ export default function ClientPage() {
     try {
       await revokeDesktopBuild(buildId);
       if (expandedKey === buildId) setExpandedKey(null);
+      if (tokenPanelKey === buildId) setTokenPanelKey(null);
       await refreshAll();
     } catch (e: unknown) {
       setPageError(e instanceof Error ? e.message : "Revoke failed.");
@@ -326,31 +349,6 @@ export default function ClientPage() {
         </div>
       )}
 
-      {justCreated && (
-        <div className="border border-base0c px-4 py-3 space-y-2">
-          <div className="flex items-center gap-3">
-            <span className="text-base05">token configured — client {justCreated.client_id}</span>
-            <button onClick={() => setJustCreated(null)} className="group cursor-pointer transition-colors ml-auto">
-              <Bracket className="text-base04 group-hover:text-base05">dismiss</Bracket>
-            </button>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-base04">token:</span>
-            <code className="text-base0a break-all">{justCreated.activation_token}</code>
-            <button onClick={() => copyToken(justCreated.activation_token)} className="group cursor-pointer transition-colors">
-              <Bracket className="text-base04 group-hover:text-base05">{copiedToken ? "copied!" : "copy"}</Bracket>
-            </button>
-          </div>
-          <p className="text-base04">
-            {(justCreated.build_options as DesktopBuildConfig).system_type === "linux"
-              ? "Copy this token, then click commands on your slot to get the docker commands."
-              : (justCreated.build_options as DesktopBuildConfig).system_type === "macos"
-                ? "Download the generic binary, follow the macOS steps under getting started, and paste this token on first run."
-                : "Download the generic binary and paste this token on first run."}
-          </p>
-          <p className="text-base04">This token is shown once — it expires in 24 hours and can only be used once.</p>
-        </div>
-      )}
 
 
       {pageError && <div className="text-status-bad">{pageError}</div>}
@@ -416,17 +414,63 @@ export default function ClientPage() {
                               </Bracket>
                             </button>
                             <button onClick={() => toggleExpand(build.id)} className="group cursor-pointer transition-colors">
-                              <Bracket className={isExpanded ? "text-base05 group-hover:text-base04" : "text-base04 group-hover:text-base05"}>token</Bracket>
+                              <Bracket className={isExpanded ? "text-base05 group-hover:text-base04" : "text-base04 group-hover:text-base05"}>configure</Bracket>
+                            </button>
+                            <button onClick={() => setTokenPanelKey((prev) => prev === build.id ? null : build.id)} className="group cursor-pointer transition-colors">
+                              <Bracket className={tokenPanelKey === build.id ? "text-base05 group-hover:text-base04" : "text-base04 group-hover:text-base05"}>token</Bracket>
                             </button>
                           </div>
                         </td>
                       </tr>
+                      {tokenPanelKey === build.id && (
+                        <tr key={`${build.id}-token`} className="border-t border-base02">
+                          <td colSpan={7} className="p-0">
+                            <div className="px-4 py-3 space-y-2 bg-base02">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-base04">token:</span>
+                                {tokenByBuildId[build.id]
+                                  ? <code className="text-base0a break-all">{tokenByBuildId[build.id]}</code>
+                                  : <span className="text-base04">{build.status === "pending_activation" ? "****" : "----"}</span>}
+                                <div className="flex items-center gap-3 ml-auto">
+                                  {tokenByBuildId[build.id] && (
+                                    <button onClick={() => copyToken(tokenByBuildId[build.id])} className="group cursor-pointer transition-colors bg-base11 border border-base02 px-2 py-0.5">
+                                      <Bracket className="text-base04 group-hover:text-base05">{copiedToken ? "copied!" : "copy token"}</Bracket>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleReplaceToken(build.id)}
+                                    disabled={replacingToken === build.id}
+                                    className="group cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-base11 border border-base02 px-2 py-0.5"
+                                  >
+                                    <Bracket className="text-base0d group-hover:text-base05">{replacingToken === build.id ? "saving…" : "replace token"}</Bracket>
+                                  </button>
+                                  <button onClick={() => setTokenPanelKey(null)} className="group cursor-pointer transition-colors bg-base11 border border-base02 px-2 py-0.5">
+                                    <Bracket className="text-base04 group-hover:text-base05">cancel</Bracket>
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-base04">
+                                {tokenByBuildId[build.id]
+                                  ? (cfg.system_type === "linux"
+                                    ? "Copy this token, then click commands on your slot to get the docker commands."
+                                    : cfg.system_type === "macos"
+                                      ? "Download the generic binary, follow the macOS steps under getting started, and paste this token on first run."
+                                      : "Download the generic binary and paste this token on first run.")
+                                  : build.status === "pending_activation"
+                                    ? "A token is waiting to be used. It cannot be shown again. Click replace token to make a new one."
+                                    : "This token has been used. Click replace token to make a new one."}
+                              </p>
+                              <p className="text-base04">A token expires in 24 hours and can be used once. Replacing it stops the old token from working.</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       {isExpanded && (
                         <tr key={`${build.id}-form`} className="border-t border-base02">
                           <td colSpan={7} className="p-0">
                             <BuildForm
                               initial={cfg}
-                              submitLabel="replace token"
+                              submitLabel="save + new token"
                               onSubmit={(newCfg) => handleRebuildWithConfig(build.id, build.client_id, newCfg)}
                               onCancel={() => { setExpandedKey(null); setFormError(null); }}
                               submitting={formSubmitting}
