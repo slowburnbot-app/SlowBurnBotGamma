@@ -403,16 +403,6 @@ export default function ClientPage() {
                                 {downloading === build.id ? "…" : cfg.system_type === "linux" ? "commands" : "download"}
                               </Bracket>
                             </button>
-                            <button
-                              onClick={() => handleRevoke(build.id)}
-                              disabled={revoking === build.id}
-                              className="group cursor-pointer transition-colors disabled:opacity-40"
-                              onBlur={() => setConfirmRevoke(null)}
-                            >
-                              <Bracket className={confirmRevoke === build.id ? "text-base0a group-hover:text-base05" : "text-base04 group-hover:text-base05"}>
-                                {revoking === build.id ? "…" : confirmRevoke === build.id ? "confirm?" : "revoke"}
-                              </Bracket>
-                            </button>
                             <button onClick={() => toggleExpand(build.id)} className="group cursor-pointer transition-colors">
                               <Bracket className={isExpanded ? "text-base05 group-hover:text-base04" : "text-base04 group-hover:text-base05"}>configure</Bracket>
                             </button>
@@ -444,6 +434,16 @@ export default function ClientPage() {
                                   >
                                     <Bracket className="text-base0d group-hover:text-base05">{replacingToken === build.id ? "saving…" : "replace token"}</Bracket>
                                   </button>
+                                  <button
+                                    onClick={() => handleRevoke(build.id)}
+                                    disabled={revoking === build.id}
+                                    onBlur={() => setConfirmRevoke(null)}
+                                    className="group cursor-pointer disabled:opacity-40 transition-colors bg-base11 border border-base02 px-2 py-0.5"
+                                  >
+                                    <Bracket className={confirmRevoke === build.id ? "text-base0a group-hover:text-base05" : "text-base04 group-hover:text-base05"}>
+                                      {revoking === build.id ? "…" : confirmRevoke === build.id ? "confirm?" : "revoke"}
+                                    </Bracket>
+                                  </button>
                                   <button onClick={() => setTokenPanelKey(null)} className="group cursor-pointer transition-colors bg-base11 border border-base02 px-2 py-0.5">
                                     <Bracket className="text-base04 group-hover:text-base05">cancel</Bracket>
                                   </button>
@@ -460,7 +460,7 @@ export default function ClientPage() {
                                     ? "A token is waiting to be used. It cannot be shown again. Click replace token to make a new one."
                                     : "This token has been used. Click replace token to make a new one."}
                               </p>
-                              <p className="text-base04">A token expires in 24 hours and can be used once. Replacing it stops the old token from working.</p>
+                              <p className="text-base04">A token expires in 24 hours and can be used once. Replacing it stops the old token from working. Revoke deletes the slot.</p>
                             </div>
                           </td>
                         </tr>
