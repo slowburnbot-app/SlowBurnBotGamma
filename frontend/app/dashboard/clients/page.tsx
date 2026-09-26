@@ -201,6 +201,8 @@ export default function ClientPage() {
   function showToken(result: DesktopBuildWithToken) {
     setTokenByBuildId((prev) => ({ ...prev, [result.id]: result.activation_token }));
     setTokenPanelKey(result.id);
+    setExpandedKey(null);
+    setExpandedCmdsKey(null);
   }
 
   async function handleReplaceToken(buildId: string) {
@@ -215,9 +217,18 @@ export default function ClientPage() {
     }
   }
 
+  // Only one section (configure form, commands, or token) is open on the page at a time.
   function toggleExpand(key: string) {
     setExpandedKey((prev) => prev === key ? null : key);
+    setExpandedCmdsKey(null);
+    setTokenPanelKey(null);
     setFormError(null);
+  }
+
+  function toggleTokenPanel(key: string) {
+    setTokenPanelKey((prev) => prev === key ? null : key);
+    setExpandedKey(null);
+    setExpandedCmdsKey(null);
   }
 
   async function handleNewBuild(cfg: DesktopBuildConfig) {
@@ -269,6 +280,8 @@ export default function ClientPage() {
       return;
     }
     if (cmdsByBuildId[build.id]) {
+      setExpandedKey(null);
+      setTokenPanelKey(null);
       setExpandedCmdsKey(build.id);
       return;
     }
@@ -284,6 +297,8 @@ export default function ClientPage() {
           remove_cmd: info.remove_cmd ?? "",
         },
       }));
+      setExpandedKey(null);
+      setTokenPanelKey(null);
       setExpandedCmdsKey(build.id);
     } catch (e: unknown) {
       setPageError(e instanceof Error ? e.message : "Failed to fetch commands.");
@@ -406,7 +421,7 @@ export default function ClientPage() {
                             <button onClick={() => toggleExpand(build.id)} className="group cursor-pointer transition-colors">
                               <Bracket className={isExpanded ? "text-base05 group-hover:text-base04" : "text-base04 group-hover:text-base05"}>configure</Bracket>
                             </button>
-                            <button onClick={() => setTokenPanelKey((prev) => prev === build.id ? null : build.id)} className="group cursor-pointer transition-colors">
+                            <button onClick={() => toggleTokenPanel(build.id)} className="group cursor-pointer transition-colors">
                               <Bracket className={tokenPanelKey === build.id ? "text-base05 group-hover:text-base04" : "text-base04 group-hover:text-base05"}>token</Bracket>
                             </button>
                           </div>
