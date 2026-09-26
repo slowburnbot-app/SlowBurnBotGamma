@@ -14,10 +14,12 @@ import random
 import time
 import burnBot_status as status_store
 
-# Bound on the whole home-feed like pass, mirroring like[topics]'s
-# _TOPIC_BUDGET_S — a feed stuck re-rendering the same post used to burn the
-# full max_scrolls budget (~5.5 min, 0 likes) before v1.196 (see the
-# 2026-09-04 thistlefinchdistillery run: [@richjohnsonarts] re-picked 30x).
+# Max seconds with no new like before the home-feed pass counts as stalled,
+# like like[topics]'s _TOPIC_BUDGET_S — a feed stuck re-rendering the same post
+# used to burn the full max_scrolls budget (~5.5 min, 0 likes) before v1.196
+# (see the 2026-09-04 thistlefinchdistillery run: [@richjohnsonarts] re-picked
+# 30x). The timer resets on every like: as a whole-pass cap (v1.196-v1.205) it
+# cut off every healthy 8-like pass at 7/8 (~14s per like plus skips > 120s).
 _HOME_BUDGET_S = 120
 _HOME_MAX_NO_PROGRESS_PASSES = 3
 
@@ -322,7 +324,7 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
     no_progress_passes = 0
     stall_handle = None
     like_diag_reports = 0  # cap on full-page diagnostics uploaded per action
-    t0 = time.monotonic()
+    last_like_t = time.monotonic()
 
     _blocked, _why = limit.is_action_blocked("like")
     if _blocked:
@@ -355,12 +357,12 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
         target_formatted = f"{target_count:02d}"
         
         while likes_performed < target_count and scrolls < max_scrolls:
-            if time.monotonic() - t0 > _HOME_BUDGET_S:
+            if time.monotonic() - last_like_t > _HOME_BUDGET_S:
                 _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{likes_performed}/{target_count}]"))
                 moduleWarningsLog += (
                     f"like[homepage]: [warning] feed stalled"
                     f"{f' on [@{stall_handle}]' if stall_handle else ''} - "
-                    f"budget of {_HOME_BUDGET_S}s exceeded ({likes_performed}/{target_count} likes)\n"
+                    f"no new like in {_HOME_BUDGET_S}s ({likes_performed}/{target_count} likes)\n"
                 )
                 return likes_performed, moduleErrorsLog, moduleWarningsLog
 
@@ -555,6 +557,7 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
                         hsleep(3, 4)
                     elif flipped:
                         likes_performed += 1
+                        last_like_t = time.monotonic()
                         count_formatted = f"{likes_performed:02d}"
                         _p(client_log_line(account, _scope, f"{_lbl}[{count_formatted}/{target_formatted}] - [{display_name}]"))
                         hsleep(3, 4)   # remainder of the old 6-8s pause (re-check took the rest)

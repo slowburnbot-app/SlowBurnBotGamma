@@ -385,10 +385,9 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
                 if candidates:
                     _p(client_log_line(account, _scope, f"{_lbl}fallback found {len(candidates)} follow candidate(s)"))
                 else:
-                    msg = "[error] no suggested users found"
-                    _p(client_log_line(account, _scope, f"{_lbl}{msg}"))
-                    module_errors_log += f"follow[suggested]: {msg}\n"
-                    return followed_count, module_errors_log, module_warnings_log
+                    # Stop here; the tally below logs the warning with the count.
+                    _p(client_log_line(account, _scope, f"{_lbl}no more suggested users found"))
+                    break
 
                 for user_name, follow_button, user_name_anchor in candidates:
                     if followed_count >= target_count:
@@ -446,9 +445,9 @@ def do_follow_suggested(driver, account, target_count, apiClient, account_id, _p
         
         if followed_count < target_count:
             if followed_count == 0:
-                msg = "[error] no suggested users found"
+                msg = "[warning] no suggested users found"
                 _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{followed_count}/{target_count}]"))
-                module_errors_log += f"follow[suggested]: {msg} ({followed_count}/{target_count})\n"
+                module_warnings_log += f"follow[suggested]: {msg} ({followed_count}/{target_count})\n"
             else:
                 msg = "[warning] limited suggested users found"
                 _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{followed_count}/{target_count}]"))

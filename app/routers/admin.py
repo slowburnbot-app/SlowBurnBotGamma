@@ -600,6 +600,11 @@ async def sync_bot_version(
         macos_ready = object_storage.object_exists(macos_key)
     except Exception:
         macos_ready = False
+    # Reported only, like macos_ready: the arm64 image never blocks a release.
+    try:
+        arm64_ready = await github_actions.ghcr_image_has_tag(f"{version}-arm64")
+    except Exception:
+        arm64_ready = False
 
     if not (exe_ready and image_ready):
         return JSONResponse(
@@ -610,6 +615,7 @@ async def sync_bot_version(
                 "exe_ready": exe_ready,
                 "image_ready": image_ready,
                 "macos_ready": macos_ready,
+                "arm64_ready": arm64_ready,
             },
         )
 
@@ -625,6 +631,7 @@ async def sync_bot_version(
         "exe_ready": True,
         "image_ready": True,
         "macos_ready": macos_ready,
+        "arm64_ready": arm64_ready,
     }
 
 

@@ -59,6 +59,16 @@ except ImportError:
     psutil = None
 
 
+def _chrome_service():
+    """Use the system chromedriver when the image sets SLOWBURN_CHROMEDRIVER (arm64 image).
+
+    Chrome for Testing has no linux-arm64 build, so Selenium Manager cannot fetch a
+    driver there. Return None elsewhere so Selenium Manager keeps choosing the driver.
+    """
+    path = os.environ.get("SLOWBURN_CHROMEDRIVER")
+    return ChromeService(executable_path=path) if path else None
+
+
 def build_user_data_dir(account):
     """
     Build the user data directory path for an account.
@@ -259,7 +269,7 @@ def find_existing_chrome_process(chrome_user_data_dir, account, expected_port):
                             proc_name = proc.info['name'] or ''
                             cmdline = proc.info['cmdline'] or []
                             
-                            if 'chrome' in proc_name.lower():
+                            if 'chrom' in proc_name.lower():
                                 cmdline_str = ' '.join(cmdline).lower()
                                 # Check if it's using our user data directory and profile
                                 profile_match = chrome_user_data_dir.lower() in cmdline_str and account.lower() in cmdline_str
@@ -327,7 +337,7 @@ def find_existing_chrome_process(chrome_user_data_dir, account, expected_port):
                         try:
                             proc_name = proc.info['name'] or ''
                             cmdline = proc.info['cmdline'] or []
-                            if 'chrome' in proc_name.lower():
+                            if 'chrom' in proc_name.lower():
                                 cmdline_str = ' '.join(cmdline).lower()
                                 # Check if this Chrome process matches our profile
                                 profile_match = chrome_user_data_dir.lower() in cmdline_str and account.lower() in cmdline_str
@@ -363,7 +373,7 @@ def find_existing_chrome_process(chrome_user_data_dir, account, expected_port):
                 proc_name = proc.info['name'] or ''
                 cmdline = proc.info['cmdline'] or []
 
-                if 'chrome' in proc_name.lower():
+                if 'chrom' in proc_name.lower():
                     cmdline_str = ' '.join(cmdline).lower()
                     # Check if it's using our user data directory and profile
                     # CRITICAL: Must match BOTH the user data directory AND the account name
@@ -577,8 +587,8 @@ def verify_profile_match(driver, account, chrome_user_data_dir):
                 proc_name = proc.info['name'] or ''
                 cmdline = proc.info['cmdline'] or []
                 
-                # Check for both 'chrome' and 'chromium' process names
-                if 'chrome' in proc_name.lower() or 'chromium' in proc_name.lower():
+                # 'chrom' matches chrome, chromium and chromedriver process names
+                if 'chrom' in proc_name.lower():
                     cmdline_str = ' '.join(cmdline).lower()
                     
                     # Check if user data dir is in command line
@@ -669,7 +679,7 @@ def connect_to_existing_chrome(account, chrome_user_data_dir, debug_port, chrome
         # Use Selenium 4's automatic driver management
         # When using debuggerAddress, we need chromedriver but it won't launch Chrome
         # Selenium 4 will automatically download and manage the correct ChromeDriver version
-        service = None
+        service = _chrome_service()
         
         try:
             # Use standard Selenium Chrome for reconnection
@@ -794,7 +804,7 @@ def kill_chrome_processes_for_profile(chrome_user_data_dir, account, portable_ch
                 proc_name = proc.info['name'] or ''
                 
                 # Check if it's a Chrome process
-                if 'chrome' in proc_name.lower() or 'chromedriver' in proc_name.lower():
+                if 'chrom' in proc_name.lower() or 'chromedriver' in proc_name.lower():
                     should_kill = False
                     is_portable_chrome = False
                     matches_account = False
@@ -894,7 +904,7 @@ def kill_chrome_processes_for_profile(chrome_user_data_dir, account, portable_ch
             for proc in psutil.process_iter(['pid', 'name']):
                 try:
                     proc_name = proc.info['name'] or ''
-                    if 'chrome' in proc_name.lower() or 'chromedriver' in proc_name.lower():
+                    if 'chrom' in proc_name.lower() or 'chromedriver' in proc_name.lower():
                         remaining_count += 1
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     pass
@@ -904,7 +914,7 @@ def kill_chrome_processes_for_profile(chrome_user_data_dir, account, portable_ch
             for proc in psutil.process_iter(['pid', 'name', 'exe']):
                 try:
                     proc_name = proc.info['name'] or ''
-                    if 'chrome' in proc_name.lower() or 'chromedriver' in proc_name.lower():
+                    if 'chrom' in proc_name.lower() or 'chromedriver' in proc_name.lower():
                         try:
                             proc_exe = proc.info.get('exe', '')
                             if proc_exe and portable_chrome_dir in proc_exe.lower():
@@ -1413,7 +1423,7 @@ def create_driver(account, account_idx=0):
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
                     proc_name = proc.info['name'] or ''
-                    if 'chrome' in proc_name.lower() or 'chromedriver' in proc_name.lower():
+                    if 'chrom' in proc_name.lower() or 'chromedriver' in proc_name.lower():
                         # Check if it's using our user data directory
                         cmdline = proc.info.get('cmdline', [])
                         cmdline_str = ' '.join(cmdline).lower() if cmdline else ''
@@ -1431,7 +1441,7 @@ def create_driver(account, account_idx=0):
                 for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                     try:
                         proc_name = proc.info['name'] or ''
-                        if 'chrome' in proc_name.lower() or 'chromedriver' in proc_name.lower():
+                        if 'chrom' in proc_name.lower() or 'chromedriver' in proc_name.lower():
                             cmdline = proc.info.get('cmdline', [])
                             cmdline_str = ' '.join(cmdline).lower() if cmdline else ''
                             if chrome_user_data_dir_lower in cmdline_str:
@@ -1512,7 +1522,7 @@ def create_driver(account, account_idx=0):
             # Use Selenium 4's automatic driver management (no service needed)
             # Selenium 4 will automatically download and manage the correct ChromeDriver version
             # This avoids version mismatches - Selenium 4 handles compatibility automatically
-            service = None
+            service = _chrome_service()
             
             debug_line(f"- [{account}]: Launching Chrome (this may take a moment)...")
             
@@ -1576,7 +1586,7 @@ def create_driver(account, account_idx=0):
                                 try:
                                     proc_name = proc.info['name'] or ''
                                     cmdline = proc.info['cmdline'] or []
-                                    if 'chrome' in proc_name.lower():
+                                    if 'chrom' in proc_name.lower():
                                         cmdline_str = ' '.join(cmdline).lower()
                                         if f'--remote-debugging-port={debugging_port}' in cmdline_str:
                                             print(f"- [{account}]: Killing Chrome process (PID: {proc.info['pid']}) using port {debugging_port}")
@@ -1644,7 +1654,7 @@ def create_driver(account, account_idx=0):
                         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                             try:
                                 proc_name = proc.info['name'] or ''
-                                if 'chrome' in proc_name.lower():
+                                if 'chrom' in proc_name.lower():
                                     cmdline = proc.info.get('cmdline', [])
                                     if cmdline:
                                         cmdline_str = ' '.join(cmdline).lower()
@@ -1731,7 +1741,7 @@ def create_driver(account, account_idx=0):
                         for proc in psutil.process_iter(['pid', 'name', 'exe']):
                             try:
                                 proc_name = proc.info['name'] or ''
-                                if 'chrome' in proc_name.lower() or 'chromedriver' in proc_name.lower():
+                                if 'chrom' in proc_name.lower() or 'chromedriver' in proc_name.lower():
                                     proc_exe = proc.info.get('exe', '')
                                     if proc_exe and portable_chrome_dir in proc_exe.lower():
                                         orphaned_count += 1
@@ -1758,7 +1768,7 @@ def create_driver(account, account_idx=0):
                             for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
                                 try:
                                     proc_name = proc.info['name'] or ''
-                                    if 'chrome' in proc_name.lower() or 'chromedriver' in proc_name.lower():
+                                    if 'chrom' in proc_name.lower() or 'chromedriver' in proc_name.lower():
                                         proc_exe = proc.info.get('exe', '')
                                         if proc_exe and portable_chrome_dir in proc_exe.lower():
                                             # Check if this process has an active debugging port
@@ -1816,7 +1826,7 @@ def create_driver(account, account_idx=0):
                     for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
                         try:
                             proc_name = proc.info['name'] or ''
-                            if 'chrome' in proc_name.lower():
+                            if 'chrom' in proc_name.lower():
                                 # Check if it's our account's Chrome
                                 cmdline = proc.info.get('cmdline', [])
                                 if cmdline:
@@ -1887,7 +1897,7 @@ def create_driver(account, account_idx=0):
                         for proc in psutil.process_iter(['pid', 'name']):
                             try:
                                 proc_name = proc.info['name'] or ''
-                                if 'chrome' in proc_name.lower():
+                                if 'chrom' in proc_name.lower():
                                     chrome_count += 1
                             except (psutil.NoSuchProcess, psutil.AccessDenied):
                                 pass
@@ -1946,8 +1956,8 @@ def create_driver(account, account_idx=0):
                             proc_name = proc.info['name'] or ''
                             cmdline = proc.info['cmdline'] or []
                             
-                            # Check for both 'chrome' and 'chromium' process names
-                            if 'chrome' in proc_name.lower() or 'chromium' in proc_name.lower():
+                            # 'chrom' matches chrome, chromium and chromedriver process names
+                            if 'chrom' in proc_name.lower():
                                 cmdline_str = ' '.join(cmdline).lower()
                                 
                                 # Check if user data dir is in command line
@@ -2029,7 +2039,7 @@ def create_driver(account, account_idx=0):
                             try:
                                 proc_name = proc.info['name'] or ''
                                 cmdline = proc.info['cmdline'] or []
-                                if 'chrome' in proc_name.lower():
+                                if 'chrom' in proc_name.lower():
                                     cmdline_str = ' '.join(cmdline).lower()
                                     if chrome_user_data_dir.lower() in cmdline_str and account.lower() in cmdline_str:
                                         chrome_procs.append(proc.info['pid'])

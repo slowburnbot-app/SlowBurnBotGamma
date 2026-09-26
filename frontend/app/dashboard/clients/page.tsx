@@ -520,6 +520,7 @@ export default function ClientPage() {
           </div>
           <div className="space-y-1">
             <p className="text-base05">linux/docker</p>
+            <p>Runs on x86-64 and arm64 hosts, including a Raspberry Pi 4 or 5 with 4 GB of RAM or more and a 64-bit OS. Docker pulls the correct build automatically.</p>
             <p><span className="text-base05">1.</span> Click <span className="text-base05">token</span> on an empty slot, select <span className="text-base05">linux/docker</span>, enter a name and your VNC URL, and copy the activation token shown after saving.</p>
             <p><span className="text-base05">2.</span> Click <span className="text-base05">commands</span> on your slot and run the <code className="text-base0a">docker run</code> command — it checks for image updates on every start, so no separate pull is needed. Port <code className="text-base0a">6080</code> is included for browser access.</p>
             <p><span className="text-base05">3.</span> On first launch paste your Activation Token when prompted — the config is saved to a named volume and you won&apos;t be asked again.</p>
