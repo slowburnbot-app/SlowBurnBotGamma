@@ -198,7 +198,7 @@ class BurnBotApp(App):
         padding: 1 0 0 1;
     }
     #help-box {
-        width: 62;
+        max-width: 100%;
         height: auto;
         background: $bb-surface;
         border: solid $bb-dim;
@@ -341,6 +341,11 @@ class BurnBotApp(App):
         ("/help",     "Show this screen"),
         ("Esc",       "Return to main view"),
     ]
+    # First column: as wide as the longest command, plus 2 spaces, so the descriptions line up.
+    _HELP_COL = max(len(cmd) for cmd, _ in _HELP_CMDS) + 2
+    # Box width: first column + longest description + border (2) + padding (2). Set in
+    # compose(): a Textual auto width collapses here because the rows have no width of their own.
+    _HELP_WIDTH = _HELP_COL + max(len(desc) for _, desc in _HELP_CMDS) + 4
 
     def __init__(self, version: str, client_id: str, client_name: str,
                  bot_loop_fn, stop_flag):
@@ -388,10 +393,11 @@ class BurnBotApp(App):
             yield DataTable(id="tint-table", show_header=False, cursor_type="row")
             yield Static("", id="tint-hint")
         with Vertical(id="help-overlay"):
-            with Vertical(id="help-box"):
+            with Vertical(id="help-box") as help_box:
+                help_box.styles.width = self._HELP_WIDTH
                 for cmd, desc in self._HELP_CMDS:
                     row = Text()
-                    row.append(f"{cmd:<12}", style=p["accent"])
+                    row.append(f"{cmd:<{self._HELP_COL}}", style=p["accent"])
                     row.append(desc, style=p["dim"])
                     yield Static(row)
             yield Static("", id="help-hint-inline")
@@ -769,7 +775,7 @@ class BurnBotApp(App):
             widgets = list(self.query("#help-box Static"))
             for widget, (cmd, desc) in zip(widgets, self._HELP_CMDS):
                 row = Text()
-                row.append(f"{cmd:<12}", style=p["accent"])
+                row.append(f"{cmd:<{self._HELP_COL}}", style=p["accent"])
                 row.append(desc, style=p["dim"])
                 widget.update(row)
         except Exception:
