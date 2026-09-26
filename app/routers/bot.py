@@ -589,15 +589,23 @@ async def activate_desktop_build(
     """
     now = datetime.now(timezone.utc)
 
-    # No status filter — unique (user_id, client_id) yields one row, and the
-    # consumed/expiry/hash checks below enforce single-use. A heartbeat may
-    # flip a pending slot to "activated" before its token handshake runs
-    # (an old container heartbeating the same slot); the token must still work.
+    # (user_id, client_id) is NOT unique in production: the constraint was dropped so
+    # slot numbers can be reused, and legacy revoked rows still share their slot with
+    # newer ones. Skip revoked/failed rows and take the newest, otherwise an old
+    # expired row answers for a freshly minted token ("Activation token expired.").
+    # "activated" rows stay eligible: a heartbeat may flip a pending slot to
+    # "activated" before its token handshake runs (an old container heartbeating
+    # the same slot), and the token must still work. The consumed/expiry/hash
+    # checks below enforce single-use.
     build = await session.scalar(
-        select(DesktopBuild).where(
+        select(DesktopBuild)
+        .where(
             DesktopBuild.user_id == body.user_id,
             DesktopBuild.client_id == body.client_id,
+            DesktopBuild.status.notin_(DesktopBuild.NON_OCCUPYING_STATUSES),
         )
+        .order_by(DesktopBuild.created_at.desc())
+        .limit(1)
     )
     if build is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Build not found.")
