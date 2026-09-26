@@ -131,6 +131,10 @@ def launch_manual_browser(account):
         '--use-gl=angle',
         '--use-angle=swiftshader',
         '--disable-setuid-sandbox',
+        # A container needs the sandbox flags above, and Chromium shows an "unsupported
+        # command-line flag" banner for them. --test-type hides it. The Selenium browser
+        # needs no such flag: chromedriver already adds --test-type=webdriver.
+        '--test-type',
         '--window-size=1920,1080',
         '--window-position=0,0',
     ]
