@@ -321,9 +321,10 @@ class BurnBotApp(App):
 
     BINDINGS = [
         Binding("escape", "clear_input", "Clear", show=False),
+        Binding("ctrl+l", "redraw", "Redraw", show=False, priority=True),
     ]
 
-    _COMMANDS = ["/browser", "/exit", "/help", "/keep-browser", "/log-clear", "/log-copy", "/log-save", "/settings", "/start", "/stop", "/tint"]
+    _COMMANDS = ["/browser", "/exit", "/help", "/keep-browser", "/log-clear", "/log-copy", "/log-save", "/redraw", "/settings", "/start", "/stop", "/tint"]
 
     _HELP_CMDS = [
         ("/stop",     "Stop all sessions (bot stays running)"),
@@ -336,6 +337,7 @@ class BurnBotApp(App):
         ("/log-clear", "Clear the terminal log screen"),
         ("/browser [account]", "Open a browser into the VNC display for manual login checks"),
         ("/keep-browser", "Toggle whether the session browser stays open after a session"),
+        ("/redraw",   "Repaint the screen and turn the mouse on again (Ctrl-L)"),
         ("/help",     "Show this screen"),
         ("Esc",       "Return to main view"),
     ]
@@ -1069,6 +1071,8 @@ class BurnBotApp(App):
             self._open_tint()
         elif cmd == "/help":
             self._open_help()
+        elif cmd == "/redraw":
+            self._resync_terminal()
         elif cmd == "/log-save":
             ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
             fname = f"slowburnbot_log_{ts}.txt"
@@ -1124,6 +1128,41 @@ class BurnBotApp(App):
             self._activate_settings_row(event.cursor_row)
         elif event.data_table.id == "tint-table":
             self._activate_tint_row(event.cursor_row)
+
+    def _resync_terminal(self) -> None:
+        """Send the terminal setup codes again, then repaint the whole screen.
+
+        Textual sends the codes (alternate screen, mouse, bracketed paste, focus events,
+        no line wrap) once, at startup. A container that starts detached (docker run -d)
+        sends them to no terminal, so a later `docker attach` shows the app on the normal
+        screen, with no mouse, and with every part that never changes left unpainted.
+        Only Textual's Linux driver (also used on macOS) has these methods.
+        """
+        driver = getattr(self, "_driver", None)
+        if driver is not None and hasattr(driver, "_enable_mouse_support"):
+            try:
+                driver.write("\x1b[?1049h")  # alternate screen
+                driver.write("\x1b[?25l")    # hide cursor
+                driver.write("\x1b[?1004h")  # focus in/out events
+                driver._enable_mouse_support()
+                driver._enable_bracketed_paste()
+                driver._disable_line_wrap()
+                if hasattr(driver, "flush"):
+                    driver.flush()
+            except Exception:
+                pass  # cosmetic only: never let it break the UI
+        try:
+            # Widget.refresh() marks the whole screen dirty, at any size.
+            self.screen.refresh(layout=True)
+        except Exception:
+            pass  # no screen yet (first resize event at startup)
+
+    def on_resize(self, _event) -> None:
+        # A resize after `docker attach` is the first sign of the new terminal.
+        self._resync_terminal()
+
+    def action_redraw(self) -> None:
+        self._resync_terminal()
 
     def action_clear_input(self) -> None:
         if self._prompt_mode:
