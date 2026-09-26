@@ -192,16 +192,25 @@ async def get_download_url(
         image_ref = f"{settings.ghcr_namespace}/slowburnbot-client:latest"
         # Activation token not returned here — it's shown on the build row at creation time
         cid = str(build.client_id).zfill(2)
+        name = f"slowburn-client{cid}"
+        shared = (
+            f"--pull always "
+            f"--name {name} "
+            f"-v {name}-data:/data "
+            f"-v /etc/localtime:/etc/localtime:ro "
+            f"-p 6080:6080 "
+            f"{image_ref}"
+        )
         return {
             "image_ref": image_ref,
-            "run_cmd": (
-                f"docker run -it --rm --pull always "
-                f"--name slowburn-client{cid} "
-                f"-v slowburn-client{cid}-data:/data "
-                f"-v /etc/localtime:/etc/localtime:ro "
-                f"-p 6080:6080 "
-                f"{image_ref}"
-            ),
+            "run_cmd": f"docker run -it --rm {shared}",
+            # Always-on: detached, keeps a TTY so `docker attach` shows the TUI, and
+            # restarts after a crash or reboot. --rm cannot be combined with --restart.
+            "run_always_on_cmd": f"docker run -dit --restart unless-stopped {shared}",
+            "attach_cmd": f"docker attach {name}",
+            # A restart policy does not pull a new image, so an update removes the
+            # container and runs the always-on command again (the /data volume stays).
+            "remove_cmd": f"docker rm -f {name}",
         }
 
     if not settings.bucket_name or not settings.bucket_access_key_id:

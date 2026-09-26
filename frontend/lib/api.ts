@@ -702,6 +702,9 @@ export interface DownloadInfo {
   // Linux
   image_ref?: string;
   run_cmd?: string;
+  run_always_on_cmd?: string;
+  attach_cmd?: string;
+  remove_cmd?: string;
 }
 
 export async function createDesktopBuild(config: DesktopBuildConfig, slotNumber?: number): Promise<DesktopBuildWithToken> {

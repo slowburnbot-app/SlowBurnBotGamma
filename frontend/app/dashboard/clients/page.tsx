@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   createDesktopBuild,
   revokeDesktopBuild,
@@ -155,7 +155,7 @@ export default function ClientPage() {
   const [copiedToken, setCopiedToken] = useState(false);
 
   const [expandedCmdsKey, setExpandedCmdsKey] = useState<string | null>(null);
-  const [cmdsByBuildId, setCmdsByBuildId] = useState<Record<string, { run_cmd: string }>>({});
+  const [cmdsByBuildId, setCmdsByBuildId] = useState<Record<string, { run_cmd: string; run_always_on_cmd: string; attach_cmd: string; remove_cmd: string }>>({});
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
   const [pageError, setPageError] = useState<string | null>(null);
@@ -253,7 +253,15 @@ export default function ClientPage() {
     setDownloading(build.id);
     try {
       const info = await getDownloadInfo(build.id);
-      setCmdsByBuildId((prev) => ({ ...prev, [build.id]: { run_cmd: info.run_cmd ?? "" } }));
+      setCmdsByBuildId((prev) => ({
+        ...prev,
+        [build.id]: {
+          run_cmd: info.run_cmd ?? "",
+          run_always_on_cmd: info.run_always_on_cmd ?? "",
+          attach_cmd: info.attach_cmd ?? "",
+          remove_cmd: info.remove_cmd ?? "",
+        },
+      }));
       setExpandedCmdsKey(build.id);
     } catch (e: unknown) {
       setPageError(e instanceof Error ? e.message : "Failed to fetch commands.");
@@ -432,15 +440,24 @@ export default function ClientPage() {
                           <td colSpan={7} className="p-0">
                             <div className="px-4 py-3 space-y-2 bg-base02">
                               <div className="grid gap-x-4 gap-y-1" style={{ gridTemplateColumns: "max-content 1fr" }}>
-                                <span className="text-base04">run:</span>
-                                <div>
-                                  <code className="text-base0a break-all">{cmdsByBuildId[build.id].run_cmd}</code>
-                                  <button onClick={() => copyCmd(cmdsByBuildId[build.id].run_cmd, `run-${build.id}`)} className="inline group cursor-pointer transition-colors ml-2">
-                                    <Bracket className="text-base04 group-hover:text-base05">{copiedCmd === `run-${build.id}` ? "copied!" : "copy"}</Bracket>
-                                  </button>
-                                </div>
-                                <span></span>
-                                <p className="text-base04">Starts the SlowBurnBot client in an interactive Docker container that auto-updates to the latest image on launch, maintains a persistent /data volume, and exposes the browser via noVNC on port 6080.</p>
+                                {[
+                                  { key: "run", label: "run:", cmd: cmdsByBuildId[build.id].run_cmd, note: "Starts the SlowBurnBot client in an interactive Docker container that auto-updates to the latest image on launch, maintains a persistent /data volume, and exposes the browser via noVNC on port 6080. The container is removed when you exit." },
+                                  { key: "always-on", label: "always-on:", cmd: cmdsByBuildId[build.id].run_always_on_cmd, note: "Runs the same client in the background. It restarts after a crash or a reboot of the Docker host. Run it once, then use the attach command to paste your Activation Token." },
+                                  { key: "attach", label: "attach:", cmd: cmdsByBuildId[build.id].attach_cmd, note: "Shows the client screen of the always-on container. To leave it running, press Ctrl-P and then Ctrl-Q. Do not press Ctrl-C: it stops the client." },
+                                  { key: "update", label: "update:", cmd: cmdsByBuildId[build.id].remove_cmd, note: "A restart does not pull a new image. To update the always-on container, run this command, then run the always-on command again. The /data volume keeps your config." },
+                                ].map((row) => (
+                                  <Fragment key={row.key}>
+                                    <span className="text-base04">{row.label}</span>
+                                    <div>
+                                      <code className="text-base0a break-all">{row.cmd}</code>
+                                      <button onClick={() => copyCmd(row.cmd, `${row.key}-${build.id}`)} className="inline group cursor-pointer transition-colors ml-2">
+                                        <Bracket className="text-base04 group-hover:text-base05">{copiedCmd === `${row.key}-${build.id}` ? "copied!" : "copy"}</Bracket>
+                                      </button>
+                                    </div>
+                                    <span></span>
+                                    <p className="text-base04 mb-2">{row.note}</p>
+                                  </Fragment>
+                                ))}
                               </div>
                             </div>
                           </td>
@@ -526,6 +543,7 @@ export default function ClientPage() {
             <p><span className="text-base05">3.</span> On first launch paste your Activation Token when prompted — the config is saved to a named volume and you won&apos;t be asked again.</p>
             <p><span className="text-base05">4.</span> If a CAPTCHA challenge appears during login, open your VNC URL in a browser to solve it, then type <code className="text-base0a">done</code> in the terminal.</p>
             <p><span className="text-base05">5.</span> Use the <code className="text-base0a">docker run</code> command to restart the client after exiting or a reboot.</p>
+            <p><span className="text-base05">6.</span> To keep the client running all the time (for example on a Raspberry Pi), run the <span className="text-base05">always-on</span> command instead of <span className="text-base05">run</span>. Then run <code className="text-base0a">docker attach</code> to see the client screen. Press <span className="text-base05">Ctrl-P</span> then <span className="text-base05">Ctrl-Q</span> to detach and leave it running. Do not press <span className="text-base05">Ctrl-C</span>, because it stops the client.</p>
           </div>
         </div>
       </div>
