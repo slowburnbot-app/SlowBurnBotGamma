@@ -25,7 +25,8 @@ None.
 None.
 
 ## Next step
-Choose a fix: seed rotation, or a retire rule for a seed with a high "in database" skip rate.
+Create a retire rule for exhausted liker seeds. A seed is exhausted when most of its liker entries are skipped as "in database".
+The other option is seed rotation. The user chose the retire rule.
 `follow[likers-accounts]` already retires a seed when its follow-back percentage is low. A new rule can use the same place.
 
 ## Key files
