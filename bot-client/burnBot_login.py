@@ -1025,7 +1025,9 @@ def check_login(driver, account=None):
         logError = True
         debugError = False
         moduleErrorsLog += process_exception(printError, noteError, logError, debugError)
-        return False, None, moduleErrorsLog
+        # A driver exception (e.g. ReadTimeoutError) says nothing about login state — don't
+        # report it as logged out, or the caller runs do_login on a healthy session.
+        return "CHECK_ERROR", None, moduleErrorsLog
 
 
 def do_login(driver, username, password, apiClient=None):
@@ -1536,7 +1538,20 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
             # Check login status
             print(client_log_line(account, "login", f"check try={attempt}/{login_tries} → checking"))
             is_logged_in, current_user, loginErrors = check_login(driver, account=account)
-            
+
+            # The check itself failed (driver error) — login state is unknown, so re-check
+            # instead of logging in. On the last try, fall back to the old logged-out path.
+            if is_logged_in == "CHECK_ERROR":
+                if loginErrors:
+                    debug_line(client_log_line(account, "login", f"debug check_login errors: {loginErrors}"))
+                if attempt < login_tries:
+                    print(client_log_line(
+                        account, "login",
+                        f"check try={attempt}/{login_tries} → error (state unknown), re-checking",
+                    ))
+                    continue
+                is_logged_in = False
+
             # Check if phone verification is required
             if is_logged_in == "VERIFICATION_REQUIRED":
                 print(client_log_line(

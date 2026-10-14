@@ -349,8 +349,12 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
     try:
         # Always navigate to the home feed before starting — the driver may be on
         # any page (explore, a profile, etc.) from a prior action or random action
+        _t0 = time.monotonic()
+        debug_line(client_log_line(account, _scope, "feed load: navigating"))
         driver.get('https://www.instagram.com/')
+        debug_line(client_log_line(account, _scope, f"feed load: get() returned after {time.monotonic() - _t0:.0f}s"))
         WebDriverWait(driver, 15).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+        debug_line(client_log_line(account, _scope, f"feed load: readyState complete after {time.monotonic() - _t0:.0f}s"))
         driver.execute_script("window.scrollTo(0, 0)")
         hsleep(2, 4)
         
@@ -366,7 +370,13 @@ def do_like_posts_home(driver, account, target_count, apiClient=None, account_id
                 )
                 return likes_performed, moduleErrorsLog, moduleWarningsLog
 
+            _t_find = time.monotonic()
             articles = driver.find_elements(By.TAG_NAME, 'article')
+            debug_line(client_log_line(
+                account, _scope,
+                f"feed pass: {len(articles)} article(s) found in {time.monotonic() - _t_find:.1f}s "
+                f"(scrolls={scrolls}, {time.monotonic() - last_like_t:.0f}s since last like)"
+            ))
 
             # Identify which visible articles are genuinely new before doing
             # any per-article work — a post that stays mounted in the DOM
