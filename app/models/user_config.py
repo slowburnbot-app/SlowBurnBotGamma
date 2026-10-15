@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,6 +46,11 @@ class UserConfig(Base):
     login_notify_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     notify_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notify_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    # IANA timezone saved from the dashboard; the daily digest sends at 9 PM in it.
+    timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Local date of the last daily digest — keeps the periodic check to one send per day.
+    daily_digest_sent_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     vnc_pin: Mapped[str | None] = mapped_column(String(8), nullable=True)
 

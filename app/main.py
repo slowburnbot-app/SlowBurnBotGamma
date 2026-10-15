@@ -14,6 +14,7 @@ from app.models.system_config import SystemConfig
 from app.routers import accounts, admin, auth_refresh, bot, config, desktop_builds, public, subscription, themes, webhooks
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.services import github_actions, object_storage
+from app.services.daily_digest import DIGEST_CHECK_SECONDS, send_daily_digests
 from app.services.trial_expiry import TRIAL_EXPIRY_CHECK_SECONDS, notify_expired_trials
 from app.settings import settings
 
@@ -84,13 +85,25 @@ async def _trial_expiry_loop() -> None:
         await asyncio.sleep(TRIAL_EXPIRY_CHECK_SECONDS)
 
 
+async def _daily_digest_loop() -> None:
+    """Check every 15 minutes whether a daily digest email is due."""
+    while True:
+        try:
+            await send_daily_digests()
+        except Exception as e:
+            logging.warning(f"Daily digest check failed: {e}")
+        await asyncio.sleep(DIGEST_CHECK_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _sync_bot_version()
     await _prune_expired_access_tokens()
     task = asyncio.create_task(_trial_expiry_loop())
+    digest_task = asyncio.create_task(_daily_digest_loop())
     yield
     task.cancel()
+    digest_task.cancel()
 
 
 app = FastAPI(

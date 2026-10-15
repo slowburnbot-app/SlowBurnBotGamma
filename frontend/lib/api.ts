@@ -624,6 +624,7 @@ export interface UserConfig {
   notify_email: string | null;
   notify_phone: string | null;
   bot_debug: boolean;
+  timezone: string | null;
   updated_at: string;
 }
 

@@ -282,6 +282,11 @@ def send_session_complete_notification(account, start_time, end_time,
         if not bool(user_config.get('notices_session', True)):
             return
 
+        # "daily": the backend sends one digest at 9 PM from the session logs.
+        if (user_config.get('notices_type') or '').strip().lower() == 'daily':
+            debug_line(client_log_line(account, "notify", "per-session notice skipped (daily digest)"))
+            return
+
         duration = end_time - start_time
         duration_minutes = int(duration.total_seconds() / 60)
         duration_seconds = int(duration.total_seconds() % 60)

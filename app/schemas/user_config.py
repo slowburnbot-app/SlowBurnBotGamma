@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from pydantic import BaseModel, field_validator
 
 
 class UserConfigUpdate(BaseModel):
@@ -23,6 +25,18 @@ class UserConfigUpdate(BaseModel):
     notify_email: str | None = None
     notify_phone: str | None = None
     bot_debug: bool | None = None
+    timezone: str | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _valid_timezone(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError("unknown timezone")
+        return v
 
 
 class UserConfigRead(BaseModel):
@@ -48,4 +62,5 @@ class UserConfigRead(BaseModel):
     notify_email: str | None
     notify_phone: str | None
     bot_debug: bool
+    timezone: str | None = None
     updated_at: datetime

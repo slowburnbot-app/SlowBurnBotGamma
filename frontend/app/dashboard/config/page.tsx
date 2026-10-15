@@ -14,6 +14,9 @@ const NOTICES_OPTIONS = [
   { value: "both", label: "both" },
 ];
 
+// Daily is for the Session row only: one summary email at 9 PM instead of one per session.
+const SESSION_NOTICES_OPTIONS = [...NOTICES_OPTIONS, { value: "daily", label: "daily" }];
+
 const sectionCls = "border border-base02 bg-base01";
 
 function formatPhone(raw: string): string {
@@ -98,6 +101,7 @@ export default function ConfigPage() {
         skip_login_check: skipLoginCheck,
         login_tries: loginTries,
         bot_debug: botDebug,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         notices_type: noticesType,
         notices_session: noticesSession,
         notices_login: noticesLogin,
@@ -140,7 +144,7 @@ export default function ConfigPage() {
           <div className="py-2 border-b border-base02 inline-flex items-center gap-0 pr-5">
             <span className="text-base04">{"type: "}</span>
             <span className="text-base05">{"["}</span>
-            <Dropdown value={noticesType} onChange={(v) => setNoticesType(v)} placeholder="----" options={NOTICES_OPTIONS} />
+            <Dropdown value={noticesType} onChange={(v) => setNoticesType(v)} placeholder="----" options={SESSION_NOTICES_OPTIONS} />
             <span className="text-base05">{"]"}</span>
           </div>
           <div className="py-2 border-b border-base02"><BracketInput label="email" value={notifyEmail} onChange={setNotifyEmail} type="email" placeholder="email@example.com" width="16ch" /></div>
