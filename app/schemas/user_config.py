@@ -25,6 +25,10 @@ class UserConfigUpdate(BaseModel):
     notify_email: str | None = None
     notify_phone: str | None = None
     bot_debug: bool | None = None
+    notices_daily: bool | None = None
+    daily_notices_type: str | None = None
+    daily_notify_email: str | None = None
+    daily_notify_phone: str | None = None
     timezone: str | None = None
 
     @field_validator("timezone")
@@ -62,5 +66,9 @@ class UserConfigRead(BaseModel):
     notify_email: str | None
     notify_phone: str | None
     bot_debug: bool
+    notices_daily: bool = False
+    daily_notices_type: str = "email"
+    daily_notify_email: str | None = None
+    daily_notify_phone: str | None = None
     timezone: str | None = None
     updated_at: datetime

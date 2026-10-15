@@ -52,6 +52,12 @@ class UserConfig(Base):
     # Local date of the last daily digest — keeps the periodic check to one send per day.
     daily_digest_sent_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # Daily digest row (see app/services/daily_digest.py); blank email/phone fall back to notify_*.
+    notices_daily: Mapped[bool] = mapped_column(Boolean, default=False)
+    daily_notices_type: Mapped[str] = mapped_column(String(10), default="email")
+    daily_notify_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    daily_notify_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
     vnc_pin: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
     # Verbose bot-client debug logging, flippable from the dashboard without

@@ -16,7 +16,7 @@ from app.database import async_session_maker
 from app.models.account import Account
 from app.models.session_log import SessionLog
 from app.models.user_config import UserConfig
-from app.services.notifications import NotificationError, send_email
+from app.services.notifications import NotificationError, send_email, send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,20 @@ def build_digest_body(day: date, rows: list[tuple[str, SessionLog]], tz: tzinfo)
     return "\n".join(lines)
 
 
+def build_digest_sms(day: date, rows: list[tuple[str, SessionLog]]) -> str:
+    """One-line digest for a text message (send_sms trims to 160 characters)."""
+    accounts = len({name for name, _ in rows})
+    actions = sum(c for _, log in rows for _, c in _slots(log))
+    errors = sum(1 for _, log in rows if log.error_message)
+    warnings = sum(1 for _, log in rows if log.warning_message)
+    text = f"SlowBurnBot {day.strftime('%m-%d')}: {accounts} accts, {len(rows)} sessions, {actions} actions"
+    if errors:
+        text += f", {errors} error(s)"
+    if warnings:
+        text += f", {warnings} warning(s)"
+    return text
+
+
 async def send_daily_digests(now: datetime | None = None) -> int:
     """Send the digest to each user who is due. Returns the number of emails sent."""
     now = now or datetime.now(timezone.utc)
@@ -83,12 +97,7 @@ async def send_daily_digests(now: datetime | None = None) -> int:
     async with async_session_maker() as session:
         configs = (
             await session.execute(
-                select(UserConfig).where(
-                    UserConfig.notices_session.is_(True),
-                    UserConfig.notices_type == "daily",
-                    UserConfig.notify_email.is_not(None),
-                    UserConfig.notify_email != "",
-                )
+                select(UserConfig).where(UserConfig.notices_daily.is_(True))
             )
         ).scalars().all()
 
@@ -109,18 +118,38 @@ async def send_daily_digests(now: datetime | None = None) -> int:
             ).all()
 
             if rows:
-                try:
-                    await send_email(
-                        to=cfg.notify_email,
-                        subject=f"SlowBurnBot daily summary - {today.isoformat()}",
-                        body=build_digest_body(today, [(n, log) for n, log in rows], tz),
-                        session=session,
-                    )
-                    sent += 1
-                except NotificationError as e:
-                    # Leave the date unset so the next check tries again.
-                    logger.warning("Daily digest failed for user %s: %s", cfg.user_id, e)
+                pairs = [(n, log) for n, log in rows]
+                channel = (cfg.daily_notices_type or "email").strip().lower()
+                email = cfg.daily_notify_email or cfg.notify_email
+                phone = cfg.daily_notify_phone or cfg.notify_phone
+                delivered = False
+                attempted = False
+                if channel in ("email", "both") and email:
+                    attempted = True
+                    try:
+                        await send_email(
+                            to=email,
+                            subject=f"SlowBurnBot daily summary - {today.isoformat()}",
+                            body=build_digest_body(today, pairs, tz),
+                            session=session,
+                        )
+                        delivered = True
+                    except NotificationError as e:
+                        logger.warning("Daily digest email failed for user %s: %s", cfg.user_id, e)
+                if channel in ("text", "both") and phone:
+                    attempted = True
+                    try:
+                        await send_sms(to=phone, body=build_digest_sms(today, pairs), session=session)
+                        delivered = True
+                    except NotificationError as e:
+                        logger.warning("Daily digest text failed for user %s: %s", cfg.user_id, e)
+                if not delivered:
+                    # Date stays unset, so the next check tries again (a failed send, or a
+                    # destination the user adds before midnight).
+                    if not attempted:
+                        logger.info("Daily digest: user %s has no destination for %r", cfg.user_id, channel)
                     continue
+                sent += 1
 
             # No sessions today: nothing to send, but mark the day so the check stops.
             cfg.daily_digest_sent_on = today

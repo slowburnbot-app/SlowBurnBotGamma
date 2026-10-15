@@ -14,9 +14,6 @@ const NOTICES_OPTIONS = [
   { value: "both", label: "both" },
 ];
 
-// Daily is for the Session row only: one summary email at 9 PM instead of one per session.
-const SESSION_NOTICES_OPTIONS = [...NOTICES_OPTIONS, { value: "daily", label: "daily" }];
-
 const sectionCls = "border border-base02 bg-base01";
 
 function formatPhone(raw: string): string {
@@ -45,6 +42,10 @@ export default function ConfigPage() {
   // Notification settings
   const [noticesType, setNoticesType] = useState("email");
   const [noticesSession, setNoticesSession] = useState(true);
+  const [noticesDaily, setNoticesDaily] = useState(false);
+  const [dailyNoticesType, setDailyNoticesType] = useState("email");
+  const [dailyNotifyEmail, setDailyNotifyEmail] = useState("");
+  const [dailyNotifyPhone, setDailyNotifyPhone] = useState("");
   const [noticesLogin, setNoticesLogin] = useState(true);
   const [loginNoticesType, setLoginNoticesType] = useState("email");
   const [loginNotifyEmail, setLoginNotifyEmail] = useState("");
@@ -73,6 +74,10 @@ export default function ConfigPage() {
         setBotDebug(c.bot_debug);
         setNoticesType(c.notices_type);
         setNoticesSession(c.notices_session);
+        setNoticesDaily(c.notices_daily);
+        setDailyNoticesType(c.daily_notices_type);
+        setDailyNotifyEmail(c.daily_notify_email ?? "");
+        setDailyNotifyPhone(c.daily_notify_phone ?? "");
         setNoticesLogin(c.notices_login);
         setLoginNoticesType(c.login_notices_type);
         setLoginNotifyEmail(c.login_notify_email ?? "");
@@ -104,6 +109,10 @@ export default function ConfigPage() {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         notices_type: noticesType,
         notices_session: noticesSession,
+        notices_daily: noticesDaily,
+        daily_notices_type: dailyNoticesType,
+        daily_notify_email: dailyNotifyEmail || null,
+        daily_notify_phone: dailyNotifyPhone || null,
         notices_login: noticesLogin,
         login_notices_type: loginNoticesType,
         login_notify_email: loginNotifyEmail || null,
@@ -144,11 +153,21 @@ export default function ConfigPage() {
           <div className="py-2 border-b border-base02 inline-flex items-center gap-0 pr-5">
             <span className="text-base04">{"type: "}</span>
             <span className="text-base05">{"["}</span>
-            <Dropdown value={noticesType} onChange={(v) => setNoticesType(v)} placeholder="----" options={SESSION_NOTICES_OPTIONS} />
+            <Dropdown value={noticesType} onChange={(v) => setNoticesType(v)} placeholder="----" options={NOTICES_OPTIONS} />
             <span className="text-base05">{"]"}</span>
           </div>
           <div className="py-2 border-b border-base02"><BracketInput label="email" value={notifyEmail} onChange={setNotifyEmail} type="email" placeholder="email@example.com" width="16ch" /></div>
           <div className="py-2 border-b border-base02"><BracketInput label="phone" value={formatPhone(notifyPhone)} onChange={(v) => setNotifyPhone(stripPhone(v))} type="tel" placeholder="(123) 456-7890" width="14ch" /></div>
+
+          <div className="py-2 border-b border-base02"><BracketCheckbox label="Daily" checked={noticesDaily} onChange={setNoticesDaily} /></div>
+          <div className="py-2 border-b border-base02 inline-flex items-center gap-0 pr-5">
+            <span className="text-base04">{"type: "}</span>
+            <span className="text-base05">{"["}</span>
+            <Dropdown value={dailyNoticesType} onChange={(v) => setDailyNoticesType(v)} placeholder="----" options={NOTICES_OPTIONS} />
+            <span className="text-base05">{"]"}</span>
+          </div>
+          <div className="py-2 border-b border-base02"><BracketInput label="email" value={dailyNotifyEmail} onChange={setDailyNotifyEmail} type="email" width="16ch" /></div>
+          <div className="py-2 border-b border-base02"><BracketInput label="phone" value={formatPhone(dailyNotifyPhone)} onChange={(v) => setDailyNotifyPhone(stripPhone(v))} type="tel" width="14ch" /></div>
 
           <div className="py-2"><BracketCheckbox label="Login/Error" checked={noticesLogin} onChange={setNoticesLogin} /></div>
           <div className="py-2 inline-flex items-center gap-0 pr-5">

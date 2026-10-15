@@ -44,7 +44,6 @@ _vnc_pin: str = ""
 _current_bot_version: str | None = None
 
 _NOTIFY_OPTIONS = ["none", "email", "sms", "both"]
-_SESSION_NOTIFY_OPTIONS = _NOTIFY_OPTIONS + ["daily"]  # daily = one backend-sent digest at 9 PM
 _session_notify: str = "none"
 _login_notify: str = "none"
 
@@ -231,7 +230,7 @@ def cycle_notify(key: str) -> None:
     global _session_notify, _login_notify
     with _lock:
         if key == "_session_notify":
-            _session_notify = _SESSION_NOTIFY_OPTIONS[(_SESSION_NOTIFY_OPTIONS.index(_session_notify) + 1) % len(_SESSION_NOTIFY_OPTIONS)]
+            _session_notify = _NOTIFY_OPTIONS[(_NOTIFY_OPTIONS.index(_session_notify) + 1) % len(_NOTIFY_OPTIONS)]
         elif key == "_login_notify":
             _login_notify = _NOTIFY_OPTIONS[(_NOTIFY_OPTIONS.index(_login_notify) + 1) % len(_NOTIFY_OPTIONS)]
 
@@ -263,8 +262,6 @@ def _cycle_to_backend(value: str) -> tuple:
         return True, "text"
     if value == "both":
         return True, "both"
-    if value == "daily":
-        return True, "daily"
     return False, "none"
 
 
@@ -279,8 +276,6 @@ def _backend_to_cycle(enabled: bool, notices_type: str | None) -> str:
         return "sms"
     if notices_type == "both":
         return "both"
-    if notices_type == "daily":
-        return "daily"
     return "none"
 
 

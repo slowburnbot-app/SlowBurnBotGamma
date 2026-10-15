@@ -624,6 +624,10 @@ export interface UserConfig {
   notify_email: string | null;
   notify_phone: string | null;
   bot_debug: boolean;
+  notices_daily: boolean;
+  daily_notices_type: string;
+  daily_notify_email: string | null;
+  daily_notify_phone: string | null;
   timezone: string | null;
   updated_at: string;
 }
