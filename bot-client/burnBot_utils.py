@@ -153,6 +153,27 @@ def close_windows(driver):
         # Driver connection might be lost, that's okay
         pass
 
+def ensure_window(driver):
+    """
+    Make sure the driver points at a live window. Returns "ok" (the current window is
+    alive), "switched" (it was dead; moved to a remaining window), "opened" (none
+    remained; opened a new tab), or "lost" (the driver session itself is gone).
+    """
+    try:
+        driver.current_window_handle
+        return "ok"
+    except Exception:
+        pass
+    try:
+        handles = driver.window_handles
+        if handles:
+            driver.switch_to.window(handles[0])
+            return "switched"
+        driver.switch_to.new_window('tab')
+        return "opened"
+    except Exception:
+        return "lost"
+
 def has_internet_connection(host="8.8.8.8", port=53, timeout=8, max_fails=3):
     if not hasattr(has_internet_connection, "fail_count"):
         has_internet_connection.fail_count = 0

@@ -5,7 +5,7 @@ from datetime import datetime
 from burnBot_config import CONFIG
 from burnBot_accountSession_setup import create_driver
 from burnBot_login import handle_account_login
-from burnBot_utils import check_schedule, process_exception, retry_on_connection_error
+from burnBot_utils import check_schedule, process_exception, retry_on_connection_error, ensure_window
 from burnBot_notifications import send_login_failure_alert, send_session_complete_notification
 from burnBot_likePostsHome import do_like_posts_home
 from burnBot_likePostsTopic import do_like_posts_topic
@@ -358,6 +358,13 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                             _act_scope = f"action[{_slot_num}]"
                             _print(client_log_line(account, _act_scope, f"{_act_label}-Attempting[{_total:02d}]"))
                             status_store.update(account, status="running", last_action=f"{_act_type} · {_act_target}")
+
+                            # A dead tab (renderer crash under load) makes every action fail
+                            # at its first driver call; point the driver at a live window first.
+                            _win = ensure_window(driver)
+                            if _win != "ok":
+                                _print(client_log_line(account, _act_scope, f"browser window was gone - {_win}"))
+                                moduleWarningsLog += f"{_act_label}: [warning] browser window was gone ({_win})\n"
 
                             try:
                                 if _act_type == "like" and _act_target in ["home", "homepage posts", "post[homepage]", "posts [homepage]"]:
