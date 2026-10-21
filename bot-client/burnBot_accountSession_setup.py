@@ -1614,6 +1614,15 @@ def create_driver(account, account_idx=0):
             # Wait for Chrome to start with timeout (increased for reliability)
             chrome_thread.join(timeout=120)  # Increased to 2 minutes
 
+            # Selenium Manager may still be downloading chromedriver (slow exit node). Retrying
+            # would start a second download that waits on the first one's lock, so wait it out.
+            if chrome_thread.is_alive() and psutil and any(
+                'selenium-manager' in (p.info.get('name') or '').lower()
+                for p in psutil.process_iter(['name'])
+            ):
+                print(f"- [{account}]: chromedriver download in progress - waiting up to 5 more minutes...")
+                chrome_thread.join(timeout=300)
+
             # Check if thread is still alive (timed out)
             if chrome_thread.is_alive():
                 # Chrome creation is taking too long - timeout
@@ -1860,7 +1869,7 @@ def create_driver(account, account_idx=0):
                     time.sleep(2)  # Additional wait before retry
                     continue
                 else:
-                    error_msg = f"Chrome launch timed out after 30 seconds (attempted {max_retries} times)"
+                    error_msg = f"Chrome launch timed out (attempted {max_retries} times)"
                     print(f"- [{account}]: FATAL ERROR: {error_msg}")
                     print(f"- [{account}]: Possible causes:")
                     print(f"- [{account}]:   - Chrome executable may be corrupted or incompatible")

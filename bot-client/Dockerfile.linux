@@ -3,10 +3,11 @@ FROM python:3.12-slim
 # Set by BuildKit to the architecture of the build (amd64 or arm64).
 ARG TARGETARCH
 
-# amd64: Google Chrome. arm64: Google publishes no arm64 Chrome, so use Debian's
+# amd64: Google Chrome plus the matching chromedriver (so Selenium Manager never downloads one
+# at launch; that download timed out on slow exit nodes). arm64: Google publishes no arm64 Chrome, so use Debian's
 # chromium + chromium-driver and link it at the path the bot expects.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget ca-certificates gnupg tzdata \
+    wget ca-certificates gnupg tzdata unzip \
     libglib2.0-0 libnss3 libx11-6 libxext6 \
     libxrender1 libxi6 libxtst6 libatk1.0-0 \
     libgtk-3-0 libasound2 \
@@ -17,7 +18,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        else \
          wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
          && apt-get install -y ./google-chrome-stable_current_amd64.deb \
-         && rm google-chrome-stable_current_amd64.deb; \
+         && rm google-chrome-stable_current_amd64.deb \
+         && CHROME_VER="$(google-chrome --version | awk '{print $3}')" \
+         && wget -q -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VER}/linux64/chromedriver-linux64.zip" \
+         && unzip -j -q /tmp/chromedriver.zip chromedriver-linux64/chromedriver -d /usr/bin \
+         && chmod +x /usr/bin/chromedriver \
+         && rm /tmp/chromedriver.zip; \
        fi \
     && rm -rf /var/lib/apt/lists/*
 
