@@ -209,8 +209,10 @@ def send_captcha_challenge_alert(account, novnc_url, run_count=0, max_runs=0, ap
         _print(client_log_line(account, "notify", f"Failed to send CAPTCHA alert: {e}"))
 
 
-def send_sms_challenge_alert(account, run_count=0, max_runs=0, apiClient=None, account_id=None, _print=None, timeout_seconds=None):
-    """Send an action-required alert when Instagram requests an SMS verification code during login."""
+def send_sms_challenge_alert(account, run_count=0, max_runs=0, apiClient=None, account_id=None, _print=None, timeout_seconds=None, channel="Verification"):
+    """Send an action-required alert when Instagram requests a verification code during login.
+
+    channel names where Instagram sent the code ("Email", "SMS", "Authenticator", or "Verification")."""
     if _print is None:
         _print = builtins.print
     try:
@@ -228,15 +230,15 @@ def send_sms_challenge_alert(account, run_count=0, max_runs=0, apiClient=None, a
         run_info = f"run {run_count}/{max_runs}" if max_runs > 0 else f"run {run_count}"
         deadline = f" within {timeout_seconds // 60} minutes" if timeout_seconds else ""
         body = (
-            f"SMS Verification Required — Action Required ({run_info})\n\n"
+            f"{channel} Verification Required — Action Required ({run_info})\n\n"
             f"Account: {account}\n\n"
-            f"Instagram is requesting an SMS verification code. "
+            f"Instagram is requesting a verification code ({channel}). "
             f"Enter the code in the bot terminal{deadline} to continue. "
             f"If the code is not entered in time, this login attempt fails and the bot moves on."
         )
         sms_deadline = f" within {timeout_seconds // 60} min" if timeout_seconds else ""
-        sms_summary = f"{account} - SMS CODE REQUIRED\nEnter the code in the bot terminal{sms_deadline}"
-        subject = f"SlowBurnBot SMS Verification - {account}"
+        sms_summary = f"{account} - {channel.upper()} CODE REQUIRED\nEnter the code in the bot terminal{sms_deadline}"
+        subject = f"SlowBurnBot {channel} Verification - {account}"
         _dispatch(account, login_type, login_email, login_phone, subject, body, sms_summary, apiClient, account_id=account_id, _print=_print)
     except Exception as e:
         _print(client_log_line(account, "notify", f"Failed to send SMS challenge alert: {e}"))

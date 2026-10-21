@@ -253,7 +253,28 @@ def dismiss_notifications_prompt(driver, context_label="login"):
 # prompt before it gives up on this login attempt and lets the client move on
 # to the next scheduled account. CAPTCHA gets longer because solving one takes
 # more time than copying a text code.
-SMS_CODE_INPUT_TIMEOUT_SECONDS = 180
+SMS_CODE_INPUT_TIMEOUT_SECONDS = 600
+
+
+def detect_code_channel(driver):
+    """Name the channel Instagram sent the challenge code to: "Email", "SMS", "Authenticator",
+    or "Verification" when the page text is unclear (so the prompt never names a wrong channel)."""
+    try:
+        text = driver.find_element(By.TAG_NAME, "body").text.lower()
+    except Exception:
+        return "Verification"
+    import re as _re
+    authenticator = "authentication app" in text or "authenticator" in text
+    email = ("check your email" in text or "your email" in text or "email address" in text
+             or "sent an email" in text or bool(_re.search(r"\w\*+@", text)))
+    sms = "text message" in text or "sms" in text or "your phone" in text
+    if authenticator and not (email or sms):
+        return "Authenticator"
+    if email and not sms:
+        return "Email"
+    if sms and not email:
+        return "SMS"
+    return "Verification"
 CAPTCHA_INPUT_TIMEOUT_SECONDS = 300
 
 # Instagram shows this interstitial ("Save your login info?") at /accounts/onetap/
@@ -1568,26 +1589,27 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                     account, "login",
                     f"verification challenge try={attempt}/{login_tries} — waiting for SMS code",
                 ))
+                _code_channel = detect_code_channel(driver)
                 try:
                     from burnBot_notifications import send_sms_challenge_alert
-                    send_sms_challenge_alert(account, apiClient=apiClient, _print=print, timeout_seconds=SMS_CODE_INPUT_TIMEOUT_SECONDS)
+                    send_sms_challenge_alert(account, apiClient=apiClient, _print=print, timeout_seconds=SMS_CODE_INPUT_TIMEOUT_SECONDS, channel=_code_channel)
                 except Exception as _sms_notif_err:
                     print(client_log_line(account, "notify", f"Warning — SMS challenge alert failed: {_sms_notif_err}"))
                 sms_code = status_store.request_operator_input(
-                    f"SMS code for @{account}:", timeout=SMS_CODE_INPUT_TIMEOUT_SECONDS
+                    f"{_code_channel} code for @{account}:", timeout=SMS_CODE_INPUT_TIMEOUT_SECONDS
                 )
                 if sms_code.strip():
-                    print(client_log_line(account, "login", "SMS code received — submitting to Instagram"))
+                    print(client_log_line(account, "login", f"{_code_channel} code received — submitting to Instagram"))
                     is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip(), account=account)
                     if not is_logged_in:
-                        print(client_log_line(account, "login", f"SMS code entry failed: {loginErrors}"))
+                        print(client_log_line(account, "login", f"{_code_channel} code entry failed: {loginErrors}"))
                         loginFailureExit = True
                         verification_requested = True
                         break
                 else:
                     print(client_log_line(
                         account, "login",
-                        f"SMS code entry cancelled or not entered within {SMS_CODE_INPUT_TIMEOUT_SECONDS}s",
+                        f"{_code_channel} code entry cancelled or not entered within {SMS_CODE_INPUT_TIMEOUT_SECONDS}s",
                     ))
                     loginFailureExit = True
                     verification_requested = True
@@ -1612,26 +1634,27 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                         account, "login",
                         f"verification challenge try={attempt}/{login_tries} — waiting for SMS code",
                     ))
+                    _code_channel = detect_code_channel(driver)
                     try:
                         from burnBot_notifications import send_sms_challenge_alert
-                        send_sms_challenge_alert(account, apiClient=apiClient, _print=print, timeout_seconds=SMS_CODE_INPUT_TIMEOUT_SECONDS)
+                        send_sms_challenge_alert(account, apiClient=apiClient, _print=print, timeout_seconds=SMS_CODE_INPUT_TIMEOUT_SECONDS, channel=_code_channel)
                     except Exception as _sms_notif_err:
                         print(client_log_line(account, "notify", f"Warning — SMS challenge alert failed: {_sms_notif_err}"))
                     sms_code = status_store.request_operator_input(
-                        f"SMS code for @{account}:", timeout=SMS_CODE_INPUT_TIMEOUT_SECONDS
+                        f"{_code_channel} code for @{account}:", timeout=SMS_CODE_INPUT_TIMEOUT_SECONDS
                     )
                     if sms_code.strip():
-                        print(client_log_line(account, "login", "SMS code received — submitting to Instagram"))
+                        print(client_log_line(account, "login", f"{_code_channel} code received — submitting to Instagram"))
                         is_logged_in, current_user, loginErrors = enter_sms_code_in_browser(driver, sms_code.strip(), account=account)
                         if not is_logged_in:
-                            print(client_log_line(account, "login", f"SMS code entry failed: {loginErrors}"))
+                            print(client_log_line(account, "login", f"{_code_channel} code entry failed: {loginErrors}"))
                             loginFailureExit = True
                             verification_requested = True
                             break
                     else:
                         print(client_log_line(
                             account, "login",
-                            f"SMS code entry cancelled or not entered within {SMS_CODE_INPUT_TIMEOUT_SECONDS}s",
+                            f"{_code_channel} code entry cancelled or not entered within {SMS_CODE_INPUT_TIMEOUT_SECONDS}s",
                         ))
                         loginFailureExit = True
                         verification_requested = True
