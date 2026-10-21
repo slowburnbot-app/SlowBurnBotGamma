@@ -2,7 +2,7 @@
 
 from burnBot_imports import *
 from burnBot_human import hsleep, htype, hclick, hhover, hscroll
-from burnBot_utils import close_windows, has_internet_connection, process_exception, delay
+from burnBot_utils import close_windows, has_internet_connection, process_exception, delay, ensure_window
 from burnBot_client_log import client_log_line
 from burnBot_run_log import debug_line
 import burnBot_status as status_store
@@ -941,7 +941,8 @@ def check_login(driver, account=None):
         except Exception:
             error_msg = "Driver connection lost - cannot check login status"
             moduleErrorsLog += error_msg
-            return False, None, moduleErrorsLog
+            # Login state is unknown, not logged out — the caller must not run do_login on a dead driver.
+            return "CHECK_ERROR", None, moduleErrorsLog
         
         # Same URL as do_login — avoids a second full page load when check then attempts credentials
         navigate_to_instagram_login_if_needed(driver, long_initial_settle=True)
@@ -1535,6 +1536,15 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
         
         for attempt in range(1, login_tries + 1):
             attempts_made = attempt
+            # A dead window (renderer crash, killed Chrome) makes check_login and do_login fail
+            # at their first driver call; recover a live window, or stop with the real cause.
+            _win = ensure_window(driver)
+            if _win == "lost":
+                browser_msg = "browser unavailable (driver session lost) - not a credentials problem"
+                print(client_log_line(account, "login", f"failed - {browser_msg}"))
+                return False, None, True, attempts_made, False, browser_msg
+            if _win != "ok":
+                print(client_log_line(account, "login", f"browser window was gone - {_win}"))
             # Check login status
             print(client_log_line(account, "login", f"check try={attempt}/{login_tries} → checking"))
             is_logged_in, current_user, loginErrors = check_login(driver, account=account)
@@ -1666,9 +1676,12 @@ def handle_account_login(driver, account, accountPass, apiClient=None):
                 # Challenge already summarized above; avoid repeating ERROR line
                 return False, current_user, True, attempts_made, verification_requested, loginDiag
 
-            error_msg = f"Login failure - wrong user: {current_user} or not logged in: {is_logged_in}"
+            if current_user and current_user != account:
+                error_msg = f"Login failure - logged in as @{current_user}, expected @{account}"
+            else:
+                error_msg = f"Login failure - not logged in to @{account} after {attempts_made} attempt(s)"
             print(client_log_line(account, "login", f"failed — {error_msg}"))
             return False, current_user, True, attempts_made, verification_requested, loginDiag
 
         # Should not reach here, but return success if we do
-        return True, current_user, False, attempts_made, False, ""
+        return True, current_user, False, attempts_made, False, ""

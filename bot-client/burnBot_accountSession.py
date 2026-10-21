@@ -273,6 +273,8 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                     session_end_time = datetime.now().astimezone()
                     if verification_requested:
                         error_msg = "[login failure] - requesting code"
+                    elif loginDiag.startswith("browser unavailable"):
+                        error_msg = "[login failure] - browser unavailable (not a credentials problem)"
                     else:
                         error_msg = f"[login failure] - {login_attempts} attempt(s) failed"
 
