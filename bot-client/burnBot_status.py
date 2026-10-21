@@ -13,6 +13,7 @@ _bot_paused: bool = False
 _stop_requested: bool = False
 _auth_failed: bool = False  # set when the session died and re-login is impossible
 _pending_command = None     # str | None
+_manual_run_requests: set = set()  # account names queued by /run (guarded by _lock)
 _log_buffer: deque = deque(maxlen=300)
 
 # Pending operator input (e.g., SMS verification code)
@@ -93,6 +94,36 @@ def get_effective_max_runs(account_name: str):
     """
     with _lock:
         return _store.get(account_name, {}).get("effective_max_runs")
+
+
+def request_manual_run(account_name: str) -> None:
+    with _lock:
+        _manual_run_requests.add(account_name)
+
+
+def pop_manual_run(account_name: str) -> bool:
+    """Remove and return True if a manual run is queued for this account."""
+    with _lock:
+        if account_name in _manual_run_requests:
+            _manual_run_requests.discard(account_name)
+            return True
+        return False
+
+
+def has_manual_run(account_name: str) -> bool:
+    with _lock:
+        return account_name in _manual_run_requests
+
+
+def has_manual_run_requests() -> bool:
+    with _lock:
+        return bool(_manual_run_requests)
+
+
+def is_manual_run(account_name: str) -> bool:
+    """True while a manual (/run) session is in progress for this account."""
+    with _lock:
+        return bool(_store.get(account_name, {}).get("manual_run"))
 
 
 def add_log(line: str) -> None:

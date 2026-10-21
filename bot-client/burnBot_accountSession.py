@@ -214,6 +214,12 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
             if _eff_max and _eff_max > 0:
                 scheduleMax = _eff_max
 
+            # A /run request bypasses the schedule and max-runs gates (the scheduler
+            # already refused disabled accounts before triggering the session).
+            _manual = status_store.is_manual_run(account)
+            if _manual:
+                _print(client_log_line(account, "summary", "manual run — schedule and max-runs checks bypassed"))
+
             # Track session start time
             session_start_time = datetime.now().astimezone()
 
@@ -221,7 +227,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
             action_counts = [0, 0, 0, 0]
 
             # Check schedule before attempting login
-            if not check_schedule(scheduleDays, scheduleStart, scheduleEnd):
+            if not _manual and not check_schedule(scheduleDays, scheduleStart, scheduleEnd):
                 _print(client_log_line(account, "summary", "skip — outside scheduled time/day"))
                 session_end_time = datetime.now().astimezone()
                 try:
@@ -236,7 +242,7 @@ def _accountSession_inner(account, account_id, idx, threads_active, stop_flag, a
                 continue
 
             # Check max runs
-            if scheduleMax > 0:
+            if scheduleMax > 0 and not _manual:
                 try:
                     current_run_count = apiClient.get_run_count(account_id)
                 except Exception as e:

@@ -324,7 +324,7 @@ class BurnBotApp(App):
         Binding("ctrl+l", "redraw", "Redraw", show=False, priority=True),
     ]
 
-    _COMMANDS = ["/browser", "/exit", "/help", "/keep-browser", "/log-clear", "/log-copy", "/log-save", "/redraw", "/settings", "/start", "/stop", "/tint"]
+    _COMMANDS = ["/browser", "/exit", "/help", "/keep-browser", "/log-clear", "/log-copy", "/log-save", "/redraw", "/run", "/settings", "/start", "/stop", "/tint"]
 
     _HELP_CMDS = [
         ("/stop",     "Stop all sessions (bot stays running)"),
@@ -336,6 +336,7 @@ class BurnBotApp(App):
         ("/log-copy", "Copy the log to the clipboard"),
         ("/log-clear", "Clear the terminal log screen"),
         ("/browser [account]", "Open a browser into the VNC display for manual login checks"),
+        ("/run <account>", "Start 1 session now, also out of schedule or at max runs (not if disabled)"),
         ("/keep-browser", "Toggle whether the session browser stays open after a session"),
         ("/redraw",   "Repaint the screen and turn the mouse on again (Ctrl-L)"),
         ("/help",     "Show this screen"),
@@ -930,7 +931,16 @@ class BurnBotApp(App):
             inp.value = "/" + typed
             inp.cursor_position = len(inp.value)
             return
-        if len(typed) > 1:
+        _acct_cmd = next((c for c in ("/run", "/browser") if typed.startswith(c + " ")), None)
+        if _acct_cmd:
+            # Account-name completion after "/run " or "/browser "
+            _prefix = typed[len(_acct_cmd) + 1:].lstrip("@").lower()
+            self._completions = [
+                f"{_acct_cmd} {n}" for n in status_store.get_all_accounts()
+                if n.lower().startswith(_prefix) and n.lower() != _prefix
+            ]
+            self._exact_match = None
+        elif len(typed) > 1:
             self._completions = [c for c in self._COMMANDS if c.startswith(typed) and c != typed]
             self._exact_match = typed if typed in self._COMMANDS else None
         else:
@@ -1056,6 +1066,31 @@ class BurnBotApp(App):
                 account, "browser", "failed to open browser — check chrome_path in config"
             )))
 
+    def _request_manual_run(self, arg: str) -> None:
+        """Handle /run <account>: queue one session that skips the schedule and max-runs gates."""
+        def log(msg: str, account: str | None = None) -> None:
+            self._write_log(_escape(client_log_line(account, "terminal-command", msg)))
+
+        wanted = arg.lstrip("@").lower()
+        if not wanted:
+            log("usage: /run <account>")
+            return
+        states = status_store.get_all_accounts()
+        name = next((n for n in states if n.lower() == wanted), None)
+        if name is None:
+            log(f"unknown account '{arg}' — tracked: {', '.join(states) or 'none yet'}")
+            return
+        state = states[name]
+        if state.get("status") in ("disabled", "system-disabled"):
+            log("not started — account is disabled", name)
+        elif status_store.is_bot_paused():
+            log("not started — bot is stopped, use /start first", name)
+        elif state.get("manual_run") or status_store.has_manual_run(name):
+            log("a manual run is already queued or running", name)
+        else:
+            status_store.request_manual_run(name)
+            log("manual run queued", name)
+
     def _dispatch_cmd(self, cmd: str) -> None:
         if not cmd or cmd == "/":
             return
@@ -1102,6 +1137,9 @@ class BurnBotApp(App):
             parts = cmd.split(maxsplit=1)
             account = parts[1].strip() if len(parts) > 1 else None
             self._open_manual_browser(account)
+        elif cmd == "/run" or cmd.startswith("/run "):
+            parts = cmd.split(maxsplit=1)
+            self._request_manual_run(parts[1].strip() if len(parts) > 1 else "")
         elif cmd == "/keep-browser":
             new_val = not status_store.is_keep_browser_open()
             status_store.set_keep_browser_open(new_val)

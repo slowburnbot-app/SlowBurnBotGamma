@@ -333,12 +333,16 @@ bot_idle_delay_minutes = CONFIG.getfloat('browser-session', 'bot_idle_delay', fa
 bot_idle_delay = bot_idle_delay_minutes * 60  # Convert to seconds
 
 # Helper function for interruptible sleep
-def sleep_with_interrupt_check(seconds, stop_flag, label=None, console=None):
-    """Sleep for `seconds`, waking early if stop_flag is set. Returns True if interrupted."""
+def sleep_with_interrupt_check(seconds, stop_flag, label=None, console=None, wake_on_manual_run=False):
+    """Sleep for `seconds`, waking early if stop_flag is set. Returns True if interrupted.
+
+    With wake_on_manual_run, also returns (False) as soon as a /run request is queued."""
     intervals = int(seconds / 0.5)
     for _ in range(intervals):
         if stop_flag.is_set() or status_store.is_stop_requested():
             return True
+        if wake_on_manual_run and status_store.has_manual_run_requests():
+            return False
         time.sleep(0.5)
     return False
 
@@ -764,6 +768,8 @@ try:
                 account_id = acct.get("id", "")
 
                 if account_name not in enabled_accounts:
+                    if status_store.pop_manual_run(account_name):
+                        console.print(client_log_line(account_name, "bot", "manual run cancelled — account disabled"))
                     status_store.update(account_name, status=_inactive_reason(acct) or "disabled", next_run="—", last_action="—", run_info="—")
                     continue
 
@@ -780,6 +786,7 @@ try:
                     status_store.update(account_name, status="no schedule", next_run="—", run_info="—")
                     continue
 
+                manual = status_store.pop_manual_run(account_name)
                 schedule = account_schedules[account_name]
                 last_run = account_last_run.get(account_name)
                 delay_config = schedule.get('delay', {'base': 60.0, 'random': 0.0})
@@ -812,7 +819,7 @@ try:
                         adjusted_start = schedule['start']
 
                 # Check if we're within the scheduled period
-                if not check_schedule(schedule['days'], adjusted_start, schedule['end']):
+                if not manual and not check_schedule(schedule['days'], adjusted_start, schedule['end']):
                     _off_run_count = run_counter.get_run_count(account_name)
                     _off_smax = schedule.get('max', 0) or 0
                     _off_run_info = f"[{_off_run_count}/{int(_off_smax)}]" if _off_smax > 0 else f"[{_off_run_count}]"
@@ -829,7 +836,9 @@ try:
                 should_run = False
                 time_until_next = None
 
-                if max_runs_reached:
+                if manual:
+                    should_run = True
+                elif max_runs_reached:
                     should_run = False
                     time_until_next = None
                 else:
@@ -856,6 +865,8 @@ try:
                     _live = next((a for a in all_accounts if a.get("name") == account_name), acct)
                     _live_reason = _inactive_reason(_live)
                     if _live_reason:
+                        if manual:
+                            console.print(client_log_line(account_name, "bot", "manual run cancelled — account disabled"))
                         status_store.update(account_name, status=_live_reason, next_run="—", last_action="—", run_info="—")
                         continue
 
@@ -863,8 +874,8 @@ try:
                     run_count = run_counter.get_run_count(account_name)
                     next_run = run_count + 1
                     run_info = f"[{next_run}/{schedule_max}]" if schedule_max > 0 else f"[{next_run}]"
-                    console.print(client_log_line(None, "bot", f"{account_name} - Triggering to ACTIVE state - run {run_info}"))
-                    status_store.update(account_name, status="initializing", next_run="—", run_info=run_info, effective_max_runs=int(schedule_max))
+                    console.print(client_log_line(None, "bot", f"{account_name} - Triggering to ACTIVE state - run {run_info}{' (manual run)' if manual else ''}"))
+                    status_store.update(account_name, status="initializing", next_run="—", run_info=run_info, effective_max_runs=int(schedule_max), manual_run=manual)
 
                     # Get or create thread on-demand
                     account_idx = account_thread_index.get(account_name)
@@ -897,7 +908,7 @@ try:
                     if not session_thread.is_alive():
                         console.print(client_log_line(account_name, "error", "session thread is dead — will respawn next cycle"))
                         account_thread_index.pop(account_name, None)
-                        status_store.update(account_name, status="error", next_run="—", run_info="—")
+                        status_store.update(account_name, status="error", next_run="—", run_info="—", manual_run=False)
                         continue
 
                     # Send running heartbeat before session starts
@@ -924,7 +935,7 @@ try:
                     if not session_thread.is_alive():
                         console.print(client_log_line(account_name, "error", "session thread died mid-run — will respawn next cycle"))
                         account_thread_index.pop(account_name, None)
-                        status_store.update(account_name, status="error", next_run="—", run_info="—")
+                        status_store.update(account_name, status="error", next_run="—", run_info="—", manual_run=False)
                         continue
 
                     # Update last run time and increment run counter
@@ -951,7 +962,7 @@ try:
                     run_info_done = f"[{new_run_count}/{schedule_max}]" if schedule_max > 0 else f"[{new_run_count}]"
                     console.print(client_log_line(account_name, "summary", f"run {run_info_done} - DONE"))
                     next_run_str = account_next_run[account_name].strftime("%m/%d %I:%M %p")
-                    status_store.update(account_name, status="idle", next_run=next_run_str, run_info=run_info_done)
+                    status_store.update(account_name, status="idle", next_run=next_run_str, run_info=run_info_done, manual_run=False)
                 elif max_runs_reached:
                     run_count = run_counter.get_run_count(account_name)
                     _max_run_info = f"[{run_count}/{int(schedule_max)}]" if schedule_max > 0 else f"[{run_count}]"
@@ -972,7 +983,7 @@ try:
                 _hb_status, _hb_account = "idle", None
             _send_hb(_hb_status, _hb_account)
 
-            if sleep_with_interrupt_check(bot_idle_delay, stop_flag, console=console):
+            if sleep_with_interrupt_check(bot_idle_delay, stop_flag, console=console, wake_on_manual_run=True):
                 return
 
     app = BurnBotApp(BOT_VERSION, _sg, _client_name, _bot_loop, stop_flag)
