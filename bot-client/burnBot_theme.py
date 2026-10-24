@@ -135,7 +135,7 @@ _STATUS_TO_ROLE = {
     "system-disabled": "error",
     "no schedule":     "error",
     "idle":            "dim",
-    "waiting":         "orange",
+    "off schedule":    "orange",
 }
 
 

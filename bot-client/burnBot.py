@@ -823,7 +823,7 @@ try:
                     _off_run_count = run_counter.get_run_count(account_name)
                     _off_smax = schedule.get('max', 0) or 0
                     _off_run_info = f"[{_off_run_count}/{int(_off_smax)}]" if _off_smax > 0 else f"[{_off_run_count}]"
-                    status_store.update(account_name, status="waiting", next_run="—", run_info=_off_run_info)
+                    status_store.update(account_name, status="off schedule", next_run="—", run_info=_off_run_info)
                     account_next_run.pop(account_name, None)
                     continue
 
