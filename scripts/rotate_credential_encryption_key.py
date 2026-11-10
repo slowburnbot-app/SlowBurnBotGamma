@@ -1,4 +1,7 @@
-"""One-time re-encryption of stored IG passwords onto a new encryption key.
+"""One-time re-encryption of stored secrets onto a new encryption key.
+
+Covers accounts.ig_password_enc and the encrypted columns of system_configs
+(smtp_password_enc, textbelt_key_enc, resend_api_key_enc).
 
 Run this BEFORE setting CREDENTIAL_ENCRYPTION_KEY in the deployed environment
 (see app/crypto.py and .env.example) — otherwise every account's stored IG
@@ -30,6 +33,9 @@ import os
 import asyncpg
 from cryptography.fernet import Fernet
 
+# Fixed list, not user input: these names go into SQL text.
+SYSTEM_CONFIG_ENC_COLUMNS = ("smtp_password_enc", "textbelt_key_enc", "resend_api_key_enc")
+
 
 def _derive_fernet(key_source: str) -> Fernet:
     # Must match app/crypto.py's derivation exactly.
@@ -59,6 +65,24 @@ async def main():
         )
         print(f"found {len(rows)} account(s) with a stored password")
 
+        config_rows = []
+        for col in SYSTEM_CONFIG_ENC_COLUMNS:
+            for row in await conn.fetch(
+                f"SELECT id, {col} AS value FROM system_configs WHERE {col} IS NOT NULL"
+            ):
+                config_rows.append((col, row["id"], row["value"]))
+        print(f"found {len(config_rows)} system_configs secret(s)")
+
+        config_updates = []
+        for col, config_id, value in config_rows:
+            try:
+                plaintext = old_fernet.decrypt(value.encode()).decode()
+            except Exception as e:
+                print(f"FAILED to decrypt system_configs.{col} under --old-key: {e}")
+                print("aborting — no rows have been written")
+                return
+            config_updates.append((col, config_id, new_fernet.encrypt(plaintext.encode()).decode()))
+
         updates = []
         for row in rows:
             try:
@@ -82,7 +106,12 @@ async def main():
                     "UPDATE accounts SET ig_password_enc = $1 WHERE id = $2",
                     new_ciphertext, account_id,
                 )
-        print(f"ok: re-encrypted {len(updates)} row(s) onto the new key")
+            for col, config_id, new_ciphertext in config_updates:
+                await conn.execute(
+                    f"UPDATE system_configs SET {col} = $1 WHERE id = $2",
+                    new_ciphertext, config_id,
+                )
+        print(f"ok: re-encrypted {len(updates)} account row(s) and {len(config_updates)} system_configs secret(s) onto the new key")
     finally:
         await conn.close()
 
