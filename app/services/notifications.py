@@ -47,7 +47,10 @@ async def send_email(
     subject: str,
     body: str,
     session: AsyncSession,
+    html: str | None = None,
 ) -> None:
+    """Send an email through Resend. `body` is the plain text; `html` is an optional
+    HTML version that clients show in place of the text."""
     config = await _load_system_config(session)
     if config is None or not config.resend_api_key_enc or not config.resend_from_address:
         raise NotificationError("Resend not configured")
@@ -60,6 +63,8 @@ async def send_email(
             "subject": subject or "SlowBurnBot",
             "text": body,
         }
+        if html:
+            payload["html"] = html
         if config.resend_reply_to:
             payload["reply_to"] = config.resend_reply_to
         async with httpx.AsyncClient(timeout=15) as client:
