@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from app.database import async_session_maker
 from app.models.account import Account
+from app.models.account_settings import AccountSettings
 from app.models.session_log import SessionLog
 from app.models.user_config import UserConfig
 from app.services.notifications import NotificationError, send_email, send_sms
@@ -76,9 +77,27 @@ def _by_account(rows: list[tuple[str, SessionLog]]) -> dict[str, list[SessionLog
     return by_account
 
 
-def build_digest_body(day: date, rows: list[tuple[str, SessionLog]], tz: tzinfo) -> str:
+def _inactive_reasons(account: Account, settings: AccountSettings | None) -> list[str]:
+    """Why an account does not run. An empty list means the account is active."""
+    reasons = []
+    if account.system_disabled:
+        reasons.append("disabled by plan limit")
+    if not account.enabled:
+        reasons.append("not enabled")
+    if not (settings and settings.schedule_days):
+        reasons.append("no schedule")
+    return reasons
+
+
+def build_digest_body(
+    day: date,
+    rows: list[tuple[str, SessionLog]],
+    tz: tzinfo,
+    inactive: list[tuple[str, list[str]]] | None = None,
+) -> str:
     """Plain-text digest. `rows` is (account name, session log), ordered by name then start time.
 
+    `inactive` is (account name, reasons) for each account that does not run.
     Mail clients that cannot show HTML show this text (see build_digest_html).
     """
     by_account = _by_account(rows)
@@ -102,6 +121,9 @@ def build_digest_body(day: date, rows: list[tuple[str, SessionLog]], tz: tzinfo)
                 lines.append("      no actions")
             lines += [f"      ERROR: {line}" for line in _issue_lines(log.error_message)]
             lines += [f"      WARN: {line}" for line in _issue_lines(log.warning_message)]
+    if inactive:
+        lines += ["", f"Not running - {len(inactive)} account(s)"]
+        lines += [f"  {name} - {', '.join(reasons)}" for name, reasons in inactive]
     return "\n".join(lines)
 
 
@@ -188,7 +210,32 @@ def _session_html(log: SessionLog, tz: tzinfo, first: bool) -> str:
     return "".join(parts)
 
 
-def build_digest_html(day: date, rows: list[tuple[str, SessionLog]], tz: tzinfo) -> str:
+def _inactive_html(inactive: list[tuple[str, list[str]]]) -> str:
+    """One card that lists the accounts that do not run, with the reason for each."""
+    items = "".join(
+        f'<tr><td valign="top" style="padding:6px 0;font-size:14px;font-weight:600;color:{_INK};'
+        f'word-break:break-word;border-top:1px solid {_LINE};">{escape(name)}</td>'
+        f'<td valign="top" align="right" style="padding:6px 0 6px 12px;font-size:13px;'
+        f'color:{_MUTED};border-top:1px solid {_LINE};">{escape(", ".join(reasons))}</td></tr>'
+        for name, reasons in inactive
+    )
+    return (
+        f'<table {_TABLE} style="background:{_CARD};border:1px solid {_LINE};border-radius:8px;'
+        f'margin:0 0 16px;border-collapse:separate;">'
+        f'<tr><td style="padding:14px 18px;">'
+        f'<div style="font-size:16px;font-weight:700;color:{_INK};padding-bottom:8px;">'
+        f'Not running <span style="font-size:13px;font-weight:400;color:{_MUTED};">'
+        f"&middot; {_plural(len(inactive), 'account')}</span></div>"
+        f"<table {_TABLE}>{items}</table></td></tr></table>"
+    )
+
+
+def build_digest_html(
+    day: date,
+    rows: list[tuple[str, SessionLog]],
+    tz: tzinfo,
+    inactive: list[tuple[str, list[str]]] | None = None,
+) -> str:
     """HTML digest with the same content as build_digest_body, for clients that show HTML."""
     by_account = _by_account(rows)
     total_actions = sum(c for _, log in rows for _, c in _slots(log))
@@ -221,6 +268,9 @@ def build_digest_html(day: date, rows: list[tuple[str, SessionLog]], tz: tzinfo)
             f"</tr></table></td></tr>"
             f'<tr><td style="padding:0 18px 4px;">{sessions}</td></tr></table>'
         )
+
+    if inactive:
+        cards.append(_inactive_html(inactive))
 
     title = f"SlowBurnBot daily summary - {day.isoformat()}"
     return (
@@ -290,6 +340,7 @@ async def send_daily_digests(now: datetime | None = None) -> int:
 
             if rows:
                 pairs = [(n, log) for n, log in rows]
+                inactive = await _inactive_accounts(session, cfg.user_id)
                 channel = (cfg.daily_notices_type or "email").strip().lower()
                 email = cfg.daily_notify_email or cfg.notify_email
                 phone = cfg.daily_notify_phone or cfg.notify_phone
@@ -301,8 +352,8 @@ async def send_daily_digests(now: datetime | None = None) -> int:
                         await send_email(
                             to=email,
                             subject=f"SlowBurnBot daily summary - {today.isoformat()}",
-                            body=build_digest_body(today, pairs, tz),
-                            html=build_digest_html(today, pairs, tz),
+                            body=build_digest_body(today, pairs, tz, inactive),
+                            html=build_digest_html(today, pairs, tz, inactive),
                             session=session,
                         )
                         delivered = True
@@ -329,6 +380,21 @@ async def send_daily_digests(now: datetime | None = None) -> int:
     if sent:
         logger.info("Daily digest: %d email(s) sent", sent)
     return sent
+
+
+async def _inactive_accounts(session, user_id) -> list[tuple[str, list[str]]]:
+    """(name, reasons) for each account of the user that does not run, ordered by name."""
+    result = await session.execute(
+        select(Account, AccountSettings)
+        .outerjoin(AccountSettings, AccountSettings.account_id == Account.id)
+        .where(Account.user_id == user_id)
+        .order_by(Account.name)
+    )
+    return [
+        (account.name, reasons)
+        for account, settings in result.all()
+        if (reasons := _inactive_reasons(account, settings))
+    ]
 
 
 async def _user_tz(session, cfg: UserConfig) -> tzinfo:
