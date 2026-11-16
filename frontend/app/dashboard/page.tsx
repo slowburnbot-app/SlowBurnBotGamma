@@ -208,7 +208,7 @@ export default function DashboardPage() {
   useEffect(() => {
     load();
     getEntitlement().then(setEntitlement).catch(() => {});
-    getRecentSessionLog(15).then((r) => setRecentLog(r.items)).catch(() => {});
+    getRecentSessionLog(50).then((r) => setRecentLog(r.items)).catch(() => {});
     const refreshClientStatus = () =>
       getClientStatus()
         .then((cs) => {
