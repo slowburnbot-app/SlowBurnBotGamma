@@ -71,9 +71,10 @@ None.
 1. [ ] Check how each bot behaved after the browsers were killed on 2026-11-20 (its TUI with `docker attach`, detach with Ctrl-P Ctrl-Q; `docker logs`), and if it recovered.
 2. [x] Find why a client runs more than 1 `chromedriver` and Chrome: 1 browser for each account, kept open by `close_browser_after_session = False`.
 3. [x] Set `close_browser_after_session = True` in all 4 client configs (2026-11-20).
-4. [ ] The user starts each client again with `bash ~/services/slowburn/update-client.sh slowburn-clientNN`, so that the setting works. Then check that the browsers close after each session (the log line "browser closed after session" is a debug line).
-5. [ ] Find why each browser uses 0.5–0.75 GB (open tabs, the profile in `clientNN-data/ChromeUserData/`, Chrome flags), and reduce it.
-6. [ ] Decide if `bot-client/burnBot_config.ini.example` should also set `close_browser_after_session = True` (a bot-client change needs a `BOT_VERSION` bump).
+4. [x] Start each client again with `bash ~/services/slowburn/update-client.sh slowburn-clientNN`, so that the setting works. Done 2026-11-20 at 17:31 by the agent at the user's request, in the Herdr pane of each client (method in `~/services/slowburn/CLAUDE.md`). All 4 sidecars healthy, exits correct, all accounts at "max runs [3/3]" for the day.
+5. [ ] At the next runs, check that each browser closes after its session (the log line "browser closed after session" is a debug line; also count the Chrome processes with `ps -u root -o comm= | grep -c chrome`).
+6. [ ] Find why each browser uses 0.5–0.75 GB (open tabs, the profile in `clientNN-data/ChromeUserData/`, Chrome flags), and reduce it.
+7. [ ] Decide if `bot-client/burnBot_config.ini.example` should also set `close_browser_after_session = True` (a bot-client change needs a `BOT_VERSION` bump).
 
 ## Key files
 
