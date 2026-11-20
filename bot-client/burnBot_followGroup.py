@@ -31,8 +31,22 @@ _SATURATION_WARN_RATIO = 0.80
 # "Similar accounts" chevron in the header (verified 2026-08-25). The <svg> is
 # SVG-namespaced, so a bare `//svg[...]` XPath never matches — locate it by
 # CSS, then walk up to the nearest role=button ancestor (two levels up).
+#
+# Instagram shows NO hover card in the carousel itself (avatar or name, verified
+# 2026-11-20), so every carousel candidate passed the follow filters unread
+# ("no-card"): 81 of 81 in 2026-11-16..19. The carousel's "See all" link opens a
+# role=dialog titled "Suggested for you" with the same ~30 accounts as rows
+# (avatar link + Follow button). Hover cards DO render there, so the follows are
+# taken from that dialog.
 _SIMILAR_CHEVRON_CSS = "svg[aria-label='Similar accounts']"
 _SIMILAR_NEXT_XPATH = "//button[@aria-label='Next'] | //*[@role='button'][@aria-label='Next']"
+_SIMILAR_SEE_ALL_XPATH = (
+    "//a[normalize-space()='See all']"
+    " | //*[@role='link'][normalize-space()='See all']"
+    " | //*[@role='button'][normalize-space()='See all']"
+)
+_DIALOG_XPATH = "//div[@role='dialog']"
+_MAX_DIALOG_STALLS = 3  # dialog scrolls with no unseen rows before treating the list as exhausted
 
 
 def _saturation_pct(skip_already, skip_private, followed_count):
@@ -106,27 +120,64 @@ def _open_similar_panel(driver, account, target_account, scope, lbl):
     return True, ""
 
 
+def _dialog_root(driver):
+    dialogs = driver.find_elements(By.XPATH, _DIALOG_XPATH)
+    return dialogs[0] if dialogs else None
+
+
+def _open_similar_list(driver, account, target_account, scope, lbl):
+    """Click the opened carousel's "See all" link and wait for the "Suggested for you"
+    dialog. Returns (opened: bool, warning: str). Without the dialog the target is
+    skipped: the carousel shows no hover cards, so its follows would bypass the filters."""
+    links = []
+    for el in driver.find_elements(By.XPATH, _SIMILAR_SEE_ALL_XPATH):
+        try:
+            if el.is_displayed():
+                links.append(el)
+        except StaleElementReferenceException:
+            continue   # the carousel re-rendered under us; a fresh copy is in the list too
+    if not links:
+        msg = f"[{target_account}] no See all link in Similar accounts - skipping"
+        _p(client_log_line(account, scope, f"{lbl}Warning: {msg}"))
+        return False, f"follow[similar]: {msg}\n"
+    try:
+        hclick(driver, links[0])
+    except Exception:
+        try:
+            driver.execute_script("arguments[0].click();", links[0])
+        except Exception:
+            pass
+    try:
+        WebDriverWait(driver, 8, ignored_exceptions=(StaleElementReferenceException,)).until(
+            lambda d: (root := _dialog_root(d)) is not None
+            and _find_home_follow_candidates(d, max_candidates=1, root=root)
+        )
+    except Exception:
+        msg = f"[{target_account}] Similar accounts list did not open or has no Follow rows - skipping"
+        _p(client_log_line(account, scope, f"{lbl}Warning: {msg}"))
+        return False, f"follow[similar]: {msg}\n"
+    hsleep(2, 3)
+    debug_line(client_log_line(account, scope, f"{lbl}Similar accounts list opened for {target_account}"))
+    return True, ""
+
+
 def _harvest_similar_accounts(driver, account, target_count, apiClient, account_id, target_account, database_names, follow_date, scope, lbl):
-    """Follow accounts from the (already opened) Similar-accounts carousel, paging with its
-    Next arrow. Returns (followed_count, skip_already, skip_private, errors_log)."""
+    """Follow accounts from the (already opened) "Suggested for you" dialog of the target,
+    scrolling it for more rows. Returns (followed_count, skip_already, skip_private, errors_log)."""
+    # Lazy import: burnBot_followEngagers imports this module.
+    from burnBot_followEngagers import _SCROLL_DIALOG_JS
+
     action_type = "similar"
     followed_count = 0
     skip_already = 0
     skip_private = 0
     module_errors_log = ""
     seen = set()
-    stall_pages = 0
-    max_stall_pages = 3  # consecutive pages with no unseen handles before treating as end of carousel
+    stalls = 0
 
-    def _advance():
+    def _scroll_dialog():
         try:
-            nxt = driver.find_element(By.XPATH, _SIMILAR_NEXT_XPATH)
-        except Exception:
-            return False
-        try:
-            driver.execute_script("arguments[0].click();", nxt)
-            hsleep(2, 4)
-            return True
+            return bool(driver.execute_script(_SCROLL_DIALOG_JS, 700))
         except Exception:
             return False
 
@@ -134,24 +185,48 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
         if status_store.is_bot_paused():
             break
 
-        # The target's own header Follow button resolves to the target's handle under the
-        # candidate heuristic — never treat it as a suggestion.
-        candidates = [
-            c for c in _find_home_follow_candidates(driver, max_candidates=60)
-            if c[0] not in seen and c[0].lower() != target_account.lower()
-        ]
+        root = _dialog_root(driver)
+        if root is None:
+            _p(client_log_line(account, scope, f"{lbl}Warning: Similar accounts list closed [{followed_count}/{target_count}]"))
+            break
+        # root scopes the search to the dialog, so the target's own header Follow
+        # button is never a candidate; the handle check stays as a guard.
+        try:
+            candidates = [
+                c for c in _find_home_follow_candidates(driver, max_candidates=60, root=root)
+                if c[0] not in seen and c[0].lower() != target_account.lower()
+            ]
+        except StaleElementReferenceException:
+            # The dialog re-mounted between _dialog_root and the scan. Count it as a
+            # stall so a dialog that keeps re-mounting cannot loop forever.
+            stalls += 1
+            if stalls >= _MAX_DIALOG_STALLS:
+                _p(client_log_line(account, scope, f"{lbl}Warning: Similar accounts list kept re-rendering [{followed_count}/{target_count}]"))
+                break
+            hsleep(1, 2)
+            continue
         if not candidates:
-            stall_pages += 1
-            if stall_pages >= max_stall_pages or not _advance():
+            stalls += 1
+            if stalls >= _MAX_DIALOG_STALLS or not _scroll_dialog():
                 _p(client_log_line(account, scope, f"{lbl}Warning: reached end of Similar accounts [{followed_count}/{target_count}]"))
                 break
+            hsleep(2, 3)
             continue
-        stall_pages = 0
+        stalls = 0
 
+        stale_batch = False
         for user_name, follow_button, user_name_anchor in candidates:
             if status_store.is_bot_paused() or followed_count >= target_count:
                 break
             seen.add(user_name)
+            # If Instagram re-renders the list (after a follow or a scroll), every element
+            # of this batch is detached. One stale button means all are: rescan.
+            try:
+                follow_button.is_displayed()
+            except StaleElementReferenceException:
+                seen.discard(user_name)
+                stale_batch = True
+                break
 
             try:
                 if user_name in database_names:
@@ -199,15 +274,22 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
                 hsleep(10, 20)
 
             except StaleElementReferenceException:
-                continue
+                seen.discard(user_name)
+                stale_batch = True
+                break
             except Exception as e:
                 error_msg = process_exception(True, f"follow user failed: {e}", True, False)
                 module_errors_log += error_msg
                 continue
 
-        if followed_count < target_count and not _advance():
-            _p(client_log_line(account, scope, f"{lbl}Warning: reached end of Similar accounts [{followed_count}/{target_count}]"))
-            break
+        if stale_batch:
+            debug_line(client_log_line(account, scope, f"{lbl}Similar accounts list re-rendered - rescanning"))
+            hsleep(1, 2)
+            continue   # fresh candidates from the current rows; no scroll
+
+        if followed_count < target_count:
+            _scroll_dialog()   # nothing new after this → the stall counter above ends the loop
+            hsleep(2, 3)
 
     return followed_count, skip_already, skip_private, module_errors_log
 
@@ -227,7 +309,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
     _done_lbl = (action_label[0].upper() + action_label[1:]) if action_label else "Done"
     """
     Follow accounts from a target account's followers / following list or its
-    Similar-accounts carousel. Targets are tried in weighted order until the count
+    Similar-accounts list ("See all" dialog). Targets are tried in weighted order until the count
     is reached or _MAX_TARGET_TRIES targets have been mined.
 
     Args:
@@ -298,9 +380,14 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                 r["not_found"] = True
                 return r
 
-            # Similar accounts: no followers/following dialog — a carousel off the profile header.
+            # Similar accounts: open the carousel off the profile header, then its
+            # "See all" dialog (the only place the hover cards render).
             if action_type == "similar":
                 opened, _warn = _open_similar_panel(driver, account, target_account, _scope, _lbl)
+                r["warnings"] += _warn
+                if not opened:
+                    return r
+                opened, _warn = _open_similar_list(driver, account, target_account, _scope, _lbl)
                 r["warnings"] += _warn
                 if not opened:
                     return r
