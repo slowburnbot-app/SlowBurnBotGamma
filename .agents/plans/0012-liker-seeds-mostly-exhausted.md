@@ -61,8 +61,7 @@ Stop the bot from wasting time on liker seeds that have no new people left.
   - Tests are in `tests/`. Run: `.venv/bin/python -m unittest discover -s tests -t .`.
 - Open after v1.223: the first runs on v1.223 are not checked yet (2026-11-25 had no runs left).
   `two_robbers` was retired for good by the old rule and the user must turn it on again on the
-  dashboard. Follow-up work from the second Fable review: see the item "Seed rate rule: stateless
-  per action" (a rested seed returns with the same history and can rest again; one action can rest a
+  dashboard. Follow-up work from the second Fable review: see item #99 "Seed pool follow-up after v1.223" (a rested seed returns with the same history and can rest again; one action can rest a
   seed for all actions; no date window for the numbers).
 
 ## Decisions
@@ -83,8 +82,8 @@ Stop the bot from wasting time on liker seeds that have no new people left.
 3. [x] Make the saturation rule see exhausted seeds: old filtered rows count as known, minimum 20 rows (v1.222). The threshold `SATURATION_RETIRE` stays 80.
 4. [x] Rework the seed pool: strikes, cool-down, `SeedBook`, vetted discovery, tombstone, unique follow target (v1.222).
 5. [x] Per-action baseline, Wilson bound, pool-average prior (v1.223).
-6. [ ] Check the first runs on v1.223 and the logs of all 4 clients (see the item "Check first v1.223 seed runs").
-7. [ ] Stateless per-action rate rule and a 120-day window (see the item "Seed rate rule: stateless per action").
+6. [ ] Check the first runs on v1.223 and the logs of all 4 clients (item #99).
+7. [ ] Stateless per-action rate rule and a 120-day window (item #99).
 
 ## Key files
 
