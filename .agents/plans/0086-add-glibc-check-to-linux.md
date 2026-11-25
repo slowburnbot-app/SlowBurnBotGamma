@@ -6,7 +6,7 @@ repo: ~/projects/SlowBurnBot
 branch: main
 status: open
 created: 2026-11-21
-updated: 2026-11-21
+updated: 2026-11-25
 ---
 
 ## Goal
@@ -28,6 +28,20 @@ image has. A green release run must mean that the image can start.
   read each bundled `.so` with `PyInstaller.archive.readers.CArchiveReader`, take the highest
   `GLIBC_2.N`. The script was in the scratchpad and is lost.
 
+- Update 2026-11-25 (written, tested locally, not yet run in CI):
+  - `scripts/check_glibc.py <binary> --max X.Y` reads each bundled library from the PyInstaller
+    archive and takes the highest `GLIBC_X.Y`. Exit 0 = ok, 1 = a library needs more (each is
+    listed), 2 = unreadable file or an archive with no library.
+  - The workflow step "Check that the runtime image can load the bundled libraries" is in the
+    `linux` and `linux-arm64` jobs, after "Build with PyInstaller" and before the image push. The
+    limit is the glibc of the image in the FROM line of `bot-client/Dockerfile.linux`
+    (`docker run --rm <image> ldd --version`; 2.41 for `python:3.12-slim`). The Dockerfile has CRLF
+    line endings, so the step removes the carriage return from the image name.
+  - Tested on the binary of the v1.223 image: highest need 2.38 (`libcrypto.so.3`). Limit 2.41 and
+    2.38: exit 0. Limit 2.37: exit 1 with 8 libraries named. Missing file and a file that is not an
+    archive: exit 2.
+  - Not possible: a test with a real v1.220 binary (gone). A low limit stands in for it.
+
 ## Decisions
 
 - Check the bundled libraries, not the binary as text. The onefile bundle is compressed, so a
@@ -43,11 +57,12 @@ image has. A green release run must mean that the image can start.
 
 ## Plan
 
-1. [ ] Write a small script `scripts/check_glibc.py` that takes the binary path and a maximum glibc version, reads each bundled `.so`, and exits 1 with the name of each library that needs more.
-2. [ ] Add a step to the `linux` job in `.github/workflows/release-bot-client.yml`, after "Build with PyInstaller" and before "Build and push Docker image". The maximum is the glibc of the runtime image (2.41).
-3. [ ] Add the same step to the `linux-arm64` job.
-4. [ ] Check that the step fails on a v1.220 style binary (build on a newer runner, or use a copy of the old binary) and passes on v1.221.
-5. [ ] Record in the release memory note that the check exists, and remove the manual method.
+1. [x] Write a small script `scripts/check_glibc.py` that takes the binary path and a maximum glibc version, reads each bundled `.so`, and exits 1 with the name of each library that needs more.
+2. [x] Add a step to the `linux` job in `.github/workflows/release-bot-client.yml`, after "Build with PyInstaller" and before "Build and push Docker image". The maximum is the glibc of the runtime image (2.41).
+3. [x] Add the same step to the `linux-arm64` job.
+4. [x] Check that the step fails on a too-new binary and passes on a good one: done locally with the v1.223 binary and a low limit. The first real proof is the next release run.
+5. [ ] Release the next bot version and check that both jobs show the step and that it passes (the run log line `check_glibc: N libraries read; highest need: ...`). If the step is wrong, the release fails before the image push (safe, but it blocks the release).
+6. [x] Record in the release memory note that the check exists (done 2026-11-25). Remove the manual method from that note after step 5 passes.
 
 ## Key files
 
