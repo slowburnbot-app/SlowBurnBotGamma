@@ -5,7 +5,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from app.models.follow_seed import FollowSeed
-from app.services.follow_seeds import _source_prefix, reactivate_if_cooled, remove_seed, reset_seed_state
+from app.services.follow_seeds import (_source_action, _source_prefix, pool_action_rates, reactivate_if_cooled,
+                                       remove_seed, reset_seed_state)
 
 NOW = datetime(2026, 11, 25, 12, 0, tzinfo=timezone.utc)
 
@@ -28,6 +29,37 @@ class SourcePrefix(unittest.TestCase):
     def test_empty_source(self):
         self.assertIsNone(_source_prefix(None))
         self.assertIsNone(_source_prefix("[likers]"))
+
+
+class SourceAction(unittest.TestCase):
+    def test_label_is_the_action(self):
+        self.assertEqual(_source_action("Nike[likers]"), "likers")
+        self.assertEqual(_source_action("#nike[likers]"), "likers")
+        self.assertEqual(_source_action("suggested[accounts]"), "accounts")
+
+    def test_no_label(self):
+        self.assertIsNone(_source_action(None))
+        self.assertIsNone(_source_action("manual"))
+
+
+class PoolActionRates(unittest.TestCase):
+    STATS = {
+        "a": {"by_action": {"likers": {"complete": 60, "followed_back": 12}, "followers": {"complete": 40, "followed_back": 20}}},
+        "b": {"by_action": {"likers": {"complete": 40, "followed_back": 8}}},
+        "other": {"by_action": {"likers": {"complete": 1000, "followed_back": 900}}},
+    }
+
+    def test_only_seed_handles_count_and_actions_stay_apart(self):
+        rates = pool_action_rates(self.STATS, {"a", "b"})
+        self.assertEqual(rates["likers"], 0.2)       # (12 + 8) / (60 + 40); "other" is not a seed
+        self.assertEqual(rates["followers"], 0.5)
+
+    def test_an_action_with_too_little_data_is_left_out(self):
+        rates = pool_action_rates({"a": {"by_action": {"similar": {"complete": 29, "followed_back": 10}}}}, {"a"})
+        self.assertNotIn("similar", rates)
+
+    def test_seed_without_history(self):
+        self.assertEqual(pool_action_rates({}, {"a"}), {})
 
 
 class CooldownReactivation(unittest.TestCase):

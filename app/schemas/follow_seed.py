@@ -20,6 +20,8 @@ class FollowSeedRead(BaseModel):
     cooldown_until: datetime | None = None
     removed_at: datetime | None = None
     # Derived from follow_targets whose source starts with "<handle>[" (all-time)
+    # by_action: the same numbers per source label, {"likers": {"complete": n, "followed_back": n}}
+    by_action: dict[str, dict[str, int]] = {}
     total: int = 0
     complete: int = 0
     followed_back: int = 0
@@ -31,6 +33,8 @@ class FollowSeedListRead(BaseModel):
     active_count: int
     # Follow-back rate across every completed target of the account (all sources)
     account_rate: float | None = None
+    # Follow-back rate of the seed pool per action ({"likers": 0.19}); an action with too little data is absent
+    action_rates: dict[str, float] = {}
 
 
 class FollowSeedCreate(BaseModel):

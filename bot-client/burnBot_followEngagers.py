@@ -336,6 +336,7 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
             seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(
                 apiClient, account_id, seeds, group_mode,
                 log=lambda m: _p(client_log_line(account, _scope, f"{_lbl}Warning: {m}")),
+                action="likers",
             )
             if group_mode == "pool":
                 maybe_discover_seeds(driver, apiClient, account_id, account, seed_pool, all_seeds, group_handles, _scope, _lbl, _p)

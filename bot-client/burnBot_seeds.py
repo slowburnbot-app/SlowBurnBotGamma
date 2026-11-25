@@ -4,15 +4,17 @@
 # follow[likers-accounts]. A seed is a target account whose followers / similar
 # accounts / post likers get mined. Instead of `random.choice` over the old
 # comma-separated text, seeds are:
-#   - picked in proportion to their smoothed follow-back rate (new seeds start
-#     at 0.5 so they get explored; saturated seeds are damped),
+#   - picked in proportion to their smoothed follow-back rate (a new seed starts
+#     at the pool average of the action so it gets explored; saturated seeds are damped),
 #   - retired when they stop paying (two saturated uses in a row, or a rate
-#     well under the account's own average once there is enough data),
+#     whose upper confidence bound is under half of the pool average of the same
+#     action once there is enough data),
 #   - replenished from the best seed's "Similar accounts" carousel whenever the
 #     active pool drops below the floor.
 # Follow-back numbers come from the backend (derived from follow_targets.source),
 # so the lag is unfollow_days — a seed's rate is known ~a month after first use.
 
+import math
 import random
 from datetime import datetime, timedelta, timezone
 
@@ -28,6 +30,9 @@ POOL_CEILING = 30          # never grow past this
 DISCOVERY_MAX_PER_PASS = 5 # new seeds per discovery pass — keeps unproven seeds from swamping proven ones
 SATURATION_RETIRE = 80     # % of the pool already known
 MIN_COMPLETE_RETIRE = 30   # completed targets before a low rate can retire a seed
+RATE_CONFIDENCE_Z = 1.645  # one-sided 95 %: a seed retires on its rate only when even the optimistic bound is low
+PRIOR_STRENGTH = 10        # a seed starts with this many imaginary completed targets at the pool average rate
+DEFAULT_PRIOR_RATE = 0.5   # the prior when the backend has no pool average yet
 _DISCOVERY_MAX_PARENTS = 3 # parents to try per pass before giving up (some profiles have no Similar panel)
 COOLDOWN_DAYS = 30         # an exhausted or soft-failed seed rests this long, then the server brings it back
 STRIKES_TO_RETIRE = 2      # soft failures (no posts, ...) in a row before a seed rests
@@ -39,8 +44,8 @@ def parse_group(group_csv):
     return [h.strip().lstrip("@") for h in (group_csv or "").split(",") if h.strip()]
 
 
-def load_seed_pool(apiClient, account_id, group_csv, group_mode="manual", log=None):
-    """(pool, account_rate, all_seeds, group_handles).
+def load_seed_pool(apiClient, account_id, group_csv, group_mode="manual", log=None, action=None):
+    """(pool, baseline_rate, all_seeds, group_handles).
 
     group_mode "manual": the pool IS the account-group text — plain entries
     (no 'id'), equal weights, so pick_seed == the original random.choice.
@@ -49,7 +54,13 @@ def load_seed_pool(apiClient, account_id, group_csv, group_mode="manual", log=No
     may use the best of them as a parent). A typed account-group handle that is not
     a seed yet becomes a "manual" seed (a removed seed stays a tombstone, so it does
     not come back). An API failure falls back to the manual list so the run still
-    does something; `log(text)` says so."""
+    does something; `log(text)` says so.
+
+    action (followers | following | similar | likers): the follow-back numbers of each seed
+    become the numbers of THAT action, and baseline_rate is the follow-back rate of the whole
+    pool in that action (the account-wide rate when the pool has too little data). A seed is
+    judged against seeds that were mined the same way: likers follow back less often than
+    suggested accounts, so the account-wide rate (dominated by those) is the wrong yardstick."""
     group_handles = parse_group(group_csv)
     manual_pool = [{"handle": h, "id": None} for h in group_handles]
     if group_mode != "pool":
@@ -67,18 +78,45 @@ def load_seed_pool(apiClient, account_id, group_csv, group_mode="manual", log=No
             if created:
                 items.append(created)
                 have.add(h.lower())
+        base = (data.get("action_rates") or {}).get(action) if action else None
+        if base is None:
+            base = data.get("account_rate")
+        for s in items:
+            if action and s.get("by_action") is not None:
+                a = s["by_action"].get(action) or {"complete": 0, "followed_back": 0}
+                s["complete"], s["followed_back"] = a["complete"], a["followed_back"]
+                s["rate"] = round(a["followed_back"] / a["complete"], 3) if a["complete"] else None
+            s["base_rate"] = base
         active = [s for s in items if s.get("active", True)]
-        return active, data.get("account_rate"), list(items), group_handles
+        return active, base, list(items), group_handles
     except Exception as e:
         if log:
             log(f"seed pool unavailable ({str(e).splitlines()[0][:80] if str(e) else type(e).__name__}) - using the account group text")
         return manual_pool, None, list(manual_pool), group_handles
 
 
+def wilson_upper(successes, n, z=RATE_CONFIDENCE_Z):
+    """Upper end of the Wilson score interval for a rate. 1.0 when n is 0."""
+    if n <= 0:
+        return 1.0
+    p = successes / n
+    z2 = z * z
+    centre = p + z2 / (2 * n)
+    margin = z * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n))
+    return min(1.0, (centre + margin) / (1 + z2 / n))
+
+
 def seed_weight(seed):
+    """Pick weight: the follow-back rate smoothed toward the pool average of the same action
+    (seed["base_rate"]), as if the seed had PRIOR_STRENGTH earlier targets at that rate. A new
+    seed so starts at the pool average, not above the proven seeds (a fixed 0.5 prior gave new
+    seeds about 80 % of the picks while their real rate is 0.1-0.3)."""
     complete = int(seed.get("complete") or 0)
     fb = int(seed.get("followed_back") or 0)
-    weight = (fb + 1) / (complete + 2)          # Laplace-smoothed follow-back rate
+    base = seed.get("base_rate")
+    if base is None:
+        base = DEFAULT_PRIOR_RATE
+    weight = (fb + PRIOR_STRENGTH * base) / (complete + PRIOR_STRENGTH)
     if int(seed.get("last_saturation") or 0) >= SATURATION_RETIRE:
         weight *= 0.25
     return max(weight, 0.01)
@@ -110,6 +148,8 @@ def decide_seed_use(seed, saturation_pct, account_rate, action=None, retire_reas
                    ("not found", "private profile").
     soft_reason:   a failure that could be transient ("no posts"). One strike; the
                    second strike in a row starts a cool-down.
+    account_rate:  the baseline: follow-back rate of the pool in this action (see load_seed_pool).
+                   A seed rests when the upper 95 % bound of its own rate is under half of it.
     good:          the use opened the seed and read rows; it ends a strike streak.
     dry_label:     the use had no rows to judge (no likes link, no candidates) and was
                    marked 100 % so the pool damps it. Two such uses in a row retire the
@@ -146,9 +186,14 @@ def decide_seed_use(seed, saturation_pct, account_rate, action=None, retire_reas
             cooldown = True
         else:
             complete = int(seed.get("complete") or 0)
-            rate = seed.get("rate")
-            if complete >= MIN_COMPLETE_RETIRE and account_rate and rate is not None and rate < account_rate / 2:
-                reason = f"follow-back {rate:.0%} vs account {account_rate:.0%}"
+            fb = int(seed.get("followed_back") or 0)
+            if complete >= MIN_COMPLETE_RETIRE and account_rate:
+                upper = wilson_upper(fb, complete)
+                if upper < account_rate / 2:
+                    # Even the optimistic end of the seed's rate is under half of the pool average.
+                    where = f" in {action}" if action else ""
+                    reason = f"follow-back {fb}/{complete}{where} (at most {upper:.0%}) vs pool {account_rate:.0%}"
+                    cooldown = True
     if reason:
         fields.update(active=False, retire_reason=reason)
         if cooldown:
@@ -313,7 +358,7 @@ def maybe_discover_seeds(driver, apiClient, account_id, account, pool, all_seeds
     from burnBot_followSuggested import _find_home_follow_candidates
 
     # Candidate parents in weighted random order — a plain max() over a pool of new seeds
-    # (all tied at the 0.5 prior) returned the same first row every run, and one parent
+    # (all tied at the same prior) returned the same first row every run, and one parent
     # without a Similar accounts button stalled discovery indefinitely. Try a few.
     parents = [s["handle"] for s in order_seeds(api_seeds or api_all)[:_DISCOVERY_MAX_PARENTS]]
     # The typed account group is the last resort: when every seed-born parent is a dead
@@ -339,11 +384,17 @@ def maybe_discover_seeds(driver, apiClient, account_id, account, pool, all_seeds
         _p(client_log_line(account, scope, f"{lbl}Warning: seed discovery found no new seeds from {len(parents)} parent(s)"))
         return []
 
+    # A new seed has no numbers yet: it takes the baseline of the loaded seeds, so it weighs like
+    # a seed at the pool average (without it seed_weight falls back to 0.5 and the new seeds
+    # get most of the picks of the run in which they were found).
+    base = next((s["base_rate"] for s in api_all + api_seeds if s.get("base_rate") is not None), None)
     added = []
     for h in found:
         created = apiClient.create_seed(account_id, h, origin=f"similar:{parent_handle}")
         # The API hands back an existing row as-is; a retired one must not re-enter the pool.
         if created and created.get("active", True):
+            if base is not None:
+                created["base_rate"] = base
             added.append(h)
             pool.append(created)
             all_seeds.append(created)

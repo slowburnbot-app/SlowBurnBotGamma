@@ -347,17 +347,6 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         # Previously followed / skipped handles + universal ignore list (case-insensitive)
         database_names = load_known_handles(apiClient, account_id, account, _scope, _lbl, _p)
 
-        # Target pool: the manual account-group list, or the self-managing seed pool
-        seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(
-            apiClient, account_id, target_accounts, group_mode,
-            log=lambda m: _p(client_log_line(account, _scope, f"{_lbl}Warning: {m}")),
-        )
-        if group_mode == "pool":
-            maybe_discover_seeds(driver, apiClient, account_id, account, seed_pool, all_seeds, group_handles, _scope, _lbl, _p)
-        if not seed_pool:
-            _p(client_log_line(account, _scope, f"{_lbl}ERROR: No target accounts provided"))
-            return 0, "No target accounts provided", ""
-
         if group_type == "account list [similar]":
             action_type, link_text = "similar", None
         elif group_type in ("followers[group]", "account list [followers]"):
@@ -369,6 +358,18 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
             return 0, f"Invalid group type: {group_type}", ""
         # Fallback error prefix matches the real log label family (mode is known here).
         _warn_lbl = action_label or f"follow[{action_type}]"
+
+        # Target pool: the manual account-group list, or the self-managing seed pool
+        seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(
+            apiClient, account_id, target_accounts, group_mode,
+            log=lambda m: _p(client_log_line(account, _scope, f"{_lbl}Warning: {m}")),
+            action=action_type,
+        )
+        if group_mode == "pool":
+            maybe_discover_seeds(driver, apiClient, account_id, account, seed_pool, all_seeds, group_handles, _scope, _lbl, _p)
+        if not seed_pool:
+            _p(client_log_line(account, _scope, f"{_lbl}ERROR: No target accounts provided"))
+            return 0, "No target accounts provided", ""
 
         def _mine_target(seed, remaining):
             """Mine one target. Returns dict(followed, skip_already, skip_private,

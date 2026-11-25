@@ -94,16 +94,90 @@ class DecideSeedUse(unittest.TestCase):
         self.assertIsNone(reason)
         self.assertEqual(fields["strikes"], 0)
 
-    def test_low_follow_back_after_enough_data_is_permanent(self):
-        s = seed(complete=40, followed_back=2, rate=0.05)
-        _fields, reason, cooldown = decide_seed_use(s, 10, 0.3, action="likers", now=NOW)
-        self.assertTrue(reason.startswith("follow-back"))
-        self.assertFalse(cooldown)
+    def test_clearly_low_follow_back_starts_a_cooldown(self):
+        # 3 of 60 (5 %): even the upper 95 % bound (about 13 %) is under half of 0.35
+        s = seed(complete=60, followed_back=3)
+        _fields, reason, cooldown = decide_seed_use(s, 10, 0.35, action="likers", now=NOW)
+        self.assertTrue(reason.startswith("follow-back 3/60 in likers"))
+        self.assertTrue(cooldown)
+
+    def test_a_noisy_borderline_rate_does_not_retire(self):
+        # 11 of 65 (17 %) was retired against 0.35 on 2026-11-25; its upper bound is about 26 %
+        s = seed(complete=65, followed_back=11)
+        _fields, reason, _cd = decide_seed_use(s, 10, 0.35, action="likers", now=NOW)
+        self.assertIsNone(reason)
 
     def test_low_follow_back_with_little_data_is_ignored(self):
-        s = seed(complete=10, followed_back=0, rate=0.0)
+        s = seed(complete=10, followed_back=0)
         _fields, reason, _cd = decide_seed_use(s, 10, 0.3, action="likers", now=NOW)
         self.assertIsNone(reason)
+
+    def test_no_baseline_means_no_rate_retirement(self):
+        s = seed(complete=100, followed_back=0)
+        _fields, reason, _cd = decide_seed_use(s, 10, None, action="likers", now=NOW)
+        self.assertIsNone(reason)
+
+
+class WilsonUpper(unittest.TestCase):
+    def test_known_values(self):
+        self.assertAlmostEqual(seeds.wilson_upper(0, 0), 1.0)
+        self.assertAlmostEqual(seeds.wilson_upper(3, 60), 0.123, places=2)
+        self.assertAlmostEqual(seeds.wilson_upper(11, 65), 0.259, places=2)
+
+    def test_more_data_narrows_the_bound(self):
+        self.assertLess(seeds.wilson_upper(50, 500), seeds.wilson_upper(5, 50))
+
+    def test_never_above_one(self):
+        self.assertLessEqual(seeds.wilson_upper(10, 10), 1.0)
+
+
+class SeedWeight(unittest.TestCase):
+    def test_new_seed_starts_at_the_pool_average(self):
+        self.assertAlmostEqual(seeds.seed_weight(seed(base_rate=0.2)), 0.2)
+
+    def test_new_seed_does_not_beat_a_proven_seed_at_the_average(self):
+        new = seeds.seed_weight(seed(base_rate=0.2))
+        proven = seeds.seed_weight(seed(base_rate=0.2, complete=100, followed_back=30))
+        self.assertGreater(proven, new)
+
+    def test_proven_bad_seed_weighs_less_than_a_new_one(self):
+        bad = seeds.seed_weight(seed(base_rate=0.2, complete=100, followed_back=2))
+        self.assertLess(bad, seeds.seed_weight(seed(base_rate=0.2)))
+
+    def test_default_prior_when_the_backend_has_no_average(self):
+        self.assertAlmostEqual(seeds.seed_weight(seed()), seeds.DEFAULT_PRIOR_RATE)
+
+    def test_saturated_seed_is_damped(self):
+        self.assertAlmostEqual(seeds.seed_weight(seed(base_rate=0.4, last_saturation=90)), 0.1)
+
+
+class DiscoveredSeedWeight(unittest.TestCase):
+    def test_discovered_seed_weighs_like_a_seed_at_the_pool_average(self):
+        # a discovered seed used to fall back to the 0.5 prior and take most of the picks
+        class Api:
+            def get_seeds(self, account_id):
+                return {"action_rates": {"likers": 0.2}, "items": [
+                    {"id": "1", "handle": "old", "active": True,
+                     "by_action": {"likers": {"complete": 100, "followed_back": 20}}}]}
+
+            def create_seed(self, account_id, handle, origin="manual"):
+                return {"id": "n", "handle": handle, "active": True, "by_action": {}}
+
+        import sys
+        from unittest.mock import MagicMock, patch
+        pool, _base, all_seeds, group = seeds.load_seed_pool(Api(), "acct", "", "pool", action="likers")
+        real, seeds._discover_from = seeds._discover_from, lambda *a, **k: ["fresh"]
+        try:
+            # maybe_discover_seeds imports the browser modules lazily: stub them for this test only
+            with patch.dict(sys.modules, {"burnBot_followGroup": MagicMock(), "burnBot_followSuggested": MagicMock()}):
+                added = seeds.maybe_discover_seeds(None, Api(), "acct", "me", pool, all_seeds, group, "s", "l-",
+                                                   lambda m: None)
+        finally:
+            seeds._discover_from = real
+        self.assertEqual(added, ["fresh"])
+        # the old seed has 20/100 = the average, so both weigh the same
+        self.assertAlmostEqual(seeds.seed_weight(pool[1]), seeds.seed_weight(pool[0]))
+        self.assertAlmostEqual(seeds.seed_weight(pool[1]), 0.2)
 
 
 class SeedBookRules(unittest.TestCase):
@@ -195,6 +269,35 @@ class LoadSeedPool(unittest.TestCase):
         self.assertEqual(sorted(s["handle"] for s in pool), ["fresh", "known"])
         self.assertEqual(len(all_seeds), 2)
         self.assertEqual(group, ["Known", "Fresh"])
+
+    def test_numbers_and_baseline_are_those_of_the_action(self):
+        class Api(self.Api):
+            def get_seeds(self, account_id):
+                return {"account_rate": 0.5, "action_rates": {"likers": 0.2}, "items": [
+                    {"id": "1", "handle": "a", "active": True, "complete": 99, "followed_back": 50, "rate": 0.5,
+                     "by_action": {"likers": {"complete": 40, "followed_back": 6}, "followers": {"complete": 59, "followed_back": 44}}},
+                    {"id": "2", "handle": "b", "active": True, "complete": 10, "followed_back": 5, "rate": 0.5,
+                     "by_action": {"followers": {"complete": 10, "followed_back": 5}}},
+                ]}
+        pool, base, _all, _g = seeds.load_seed_pool(Api(), "acct", "a,b", "pool", action="likers")
+        self.assertEqual(base, 0.2)
+        a, b = pool
+        self.assertEqual((a["complete"], a["followed_back"], a["base_rate"]), (40, 6, 0.2))
+        self.assertEqual((b["complete"], b["followed_back"], b["rate"]), (0, 0, None))
+
+    def test_baseline_falls_back_to_the_account_rate(self):
+        class Api(self.Api):
+            def get_seeds(self, account_id):
+                return {"account_rate": 0.4, "items": [{"id": "1", "handle": "a", "active": True, "by_action": {}}]}
+        _pool, base, _all, _g = seeds.load_seed_pool(Api(), "acct", "a", "pool", action="similar")
+        self.assertEqual(base, 0.4)
+
+    def test_an_old_backend_without_by_action_keeps_the_all_time_numbers(self):
+        class Api(self.Api):
+            def get_seeds(self, account_id):
+                return {"account_rate": 0.4, "items": [{"id": "1", "handle": "a", "active": True, "complete": 50, "followed_back": 9}]}
+        pool, _base, _all, _g = seeds.load_seed_pool(Api(), "acct", "a", "pool", action="likers")
+        self.assertEqual((pool[0]["complete"], pool[0]["followed_back"]), (50, 9))
 
     def test_a_removed_seed_is_not_created_again(self):
         # the tombstone comes back from the API as an inactive row

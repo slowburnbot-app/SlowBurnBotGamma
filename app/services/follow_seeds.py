@@ -25,8 +25,34 @@ def _source_prefix(source: str | None) -> str | None:
     return head or None
 
 
+def _source_action(source: str | None) -> str | None:
+    """'nike[likers]' -> 'likers'. The label of the action that mined the target."""
+    if not source or "[" not in source or not source.rstrip().endswith("]"):
+        return None
+    label = source.rsplit("[", 1)[1].rstrip().rstrip("]").strip().lower()
+    return label or None
+
+
+# A pool average needs this many completed targets before it replaces the account-wide rate.
+MIN_POOL_RATE_SAMPLE = 30
+
+
+def pool_action_rates(stats: dict[str, dict], handles: set[str]) -> dict[str, float]:
+    """Follow-back rate of the seed pool per action: {action: rate}. Only targets whose source
+    names a seed handle count, so the numbers of other sources (suggested accounts, topics) do
+    not blur them. An action with fewer than MIN_POOL_RATE_SAMPLE completed targets is left out."""
+    complete: dict[str, int] = defaultdict(int)
+    back: dict[str, int] = defaultdict(int)
+    for handle in handles:
+        for action, v in (stats.get(handle, {}).get("by_action") or {}).items():
+            complete[action] += v["complete"]
+            back[action] += v["followed_back"]
+    return {a: round(back[a] / c, 3) for a, c in complete.items() if c >= MIN_POOL_RATE_SAMPLE}
+
+
 async def seed_stats_by_handle(session: AsyncSession, account_id: uuid.UUID) -> tuple[dict[str, dict], float | None]:
-    """{handle: {total, complete, followed_back}} plus the account-wide rate."""
+    """{handle: {total, complete, followed_back, by_action}} plus the account-wide rate.
+    by_action: {"likers": {"complete": n, "followed_back": n}, ...} (the source label)."""
     result = await session.execute(
         select(
             FollowTarget.source,
@@ -37,7 +63,7 @@ async def seed_stats_by_handle(session: AsyncSession, account_id: uuid.UUID) -> 
         .where(FollowTarget.account_id == account_id)
         .group_by(FollowTarget.source)
     )
-    stats: dict[str, dict] = defaultdict(lambda: {"total": 0, "complete": 0, "followed_back": 0})
+    stats: dict[str, dict] = defaultdict(lambda: {"total": 0, "complete": 0, "followed_back": 0, "by_action": {}})
     all_complete = 0
     all_fb = 0
     for row in result.all():
@@ -50,12 +76,17 @@ async def seed_stats_by_handle(session: AsyncSession, account_id: uuid.UUID) -> 
         s["total"] += row.total
         s["complete"] += row.complete
         s["followed_back"] += row.followed_back
+        action = _source_action(row.source)
+        if action:
+            a = s["by_action"].setdefault(action, {"complete": 0, "followed_back": 0})
+            a["complete"] += row.complete
+            a["followed_back"] += row.followed_back
     account_rate = round(all_fb / all_complete, 2) if all_complete else None
     return stats, account_rate
 
 
 def seed_to_dict(seed: FollowSeed, stats: dict[str, dict]) -> dict:
-    s = stats.get(seed.handle, {"total": 0, "complete": 0, "followed_back": 0})
+    s = stats.get(seed.handle, {"total": 0, "complete": 0, "followed_back": 0, "by_action": {}})
     return {
         "id": seed.id,
         "handle": seed.handle,
@@ -70,6 +101,7 @@ def seed_to_dict(seed: FollowSeed, stats: dict[str, dict]) -> dict:
         "strikes": seed.strikes or 0,
         "cooldown_until": seed.cooldown_until,
         "removed_at": seed.removed_at,
+        "by_action": s.get("by_action", {}),
         "total": s["total"],
         "complete": s["complete"],
         "followed_back": s["followed_back"],
@@ -144,10 +176,15 @@ async def list_seeds(session: AsyncSession, account_id: uuid.UUID, active_only: 
     seeds = (await session.execute(query)).scalars().all()
     stats, account_rate = await seed_stats_by_handle(session, account_id)
     items = [seed_to_dict(s, stats) for s in seeds]
+    # The pool average counts every seed of the account (also the retired and the removed ones).
+    all_handles = set((await session.execute(
+        select(FollowSeed.handle).where(FollowSeed.account_id == account_id)
+    )).scalars().all())
     return {
         "items": items,
         "active_count": sum(1 for s in seeds if s.active),
         "account_rate": account_rate,
+        "action_rates": pool_action_rates(stats, all_handles),
     }
 
 
