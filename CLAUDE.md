@@ -22,4 +22,6 @@ Key conventions:
 - Frontend has its own scoped doc: `frontend/AGENTS.md`
 - Railway + GitHub plugins are enabled in `.claude/settings.json`
 - Deploy/release scripts live in `scripts/` (`deploy.sh`, `release-bot-client.sh`, `bump-frontend-version.mjs`)
+- Tests: `.venv/bin/python -m unittest discover -s tests -t .` (Selenium is stubbed in `tests/_stubs.py`). They cover the seed pool logic and the seed rules of the backend.
+- Many files use CRLF line endings (`app/routers/*.py`, `bot-client/*.py`, some frontend files); others use LF. Edit them with the Edit tool. A Python rewrite in text mode changes every line ending: check with `grep -c $'\r' <file>` before a scripted edit.
 - Never modify secrets, credentials, or deployment configs without explicit confirmation
