@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +12,8 @@ class FollowTarget(Base):
     """Per-account follow/unfollow database — mirrors per-account sheet tabs."""
 
     __tablename__ = "follow_targets"
+    # One row per (account, handle), case-insensitive. Created by alembic e7f8a9b0c1d2.
+    __table_args__ = (Index("uq_follow_targets_account_handle", "account_id", text("lower(target_handle)"), unique=True),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

@@ -516,10 +516,12 @@ class ApiClient:
     # Follow targets
     # ------------------------------------------------------------------
 
-    def get_follow_targets(self, account_id, status=None, older_than_days=None, page=1, page_size=500):
+    def get_follow_targets(self, account_id, status=None, older_than_days=None, page=1, page_size=500,
+                           raise_on_error=False):
         """
         Fetch follow targets for an account with optional filtering.
-        Returns list of target dicts.
+        Returns list of target dicts. A failure returns [] (it looks like "no targets") unless
+        raise_on_error: a caller that builds the do-not-follow set must not go on with a partial one.
         """
         params = {"page": page, "page_size": page_size}
         if status:
@@ -531,17 +533,20 @@ class ApiClient:
             return resp.json()
         except Exception as e:
             _log_api_err(e, "Failed to fetch follow targets")
+            if raise_on_error:
+                raise
             return []
 
     def get_all_follow_target_handles(self, account_id):
         """
         Fetch ALL follow target handles for duplicate checking.
         Pages through results automatically. Returns set of lowercase handles.
+        Raises when a page cannot be fetched: a partial set would pass duplicates as new.
         """
         handles = set()
         page = 1
         while True:
-            targets = self.get_follow_targets(account_id, page=page, page_size=5000)
+            targets = self.get_follow_targets(account_id, page=page, page_size=5000, raise_on_error=True)
             if not targets:
                 break
             for t in targets:

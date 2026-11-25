@@ -301,6 +301,9 @@ export interface FollowSeed {
   retire_reason: string | null;
   last_used_at: string | null;
   last_saturation: number | null;
+  last_action: string | null;
+  strikes: number;
+  cooldown_until: string | null;
   total: number;
   complete: number;
   followed_back: number;

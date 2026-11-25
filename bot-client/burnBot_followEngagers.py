@@ -37,7 +37,7 @@ from burnBot_followSuggested import _find_home_follow_candidates
 import burnBot_followGroup as _fg
 from burnBot_followGroup import _saturation_warning, _saturation_pct, _ZERO_YIELD_SATURATION
 from burnBot_followFilter import load_known_handles, screen_candidate
-from burnBot_seeds import load_seed_pool, order_seeds, finish_seed_use, maybe_discover_seeds
+from burnBot_seeds import load_seed_pool, order_seeds, maybe_discover_seeds, SeedBook
 import burnBot_likePostsTopic as _lpt
 from burnBot_likePostsTopic import _open_topic_search_results
 import burnBot_status as status_store
@@ -51,6 +51,10 @@ _MAX_FOLLOWS_PER_POST = 8    # spread the day's follows across posts (and look l
 _POST_BUDGET_S = 150         # per-post wall clock incl. ~15s human-paced follows
 _MAX_STALL_SCROLLS = 3       # dialog scrolls with no new rows before treating the list as exhausted
 _DIALOG_XPATH = "//div[@role='dialog']"
+# Profile page of a private account (verified 2026-11-25: "This profile is private").
+_PRIVATE_PAGE_XPATH = (
+    "//*[contains(text(), 'This profile is private') or contains(text(), 'This account is private')]"
+)
 
 # Scroll the likers list: the scroll container is the first dialog descendant that
 # actually overflows. Returns false when nothing scrollable was found.
@@ -224,10 +228,7 @@ def _harvest_post_likers(driver, account, remaining, apiClient, account_id, sour
                 break
             try:
                 if user_name in known:
-                    if known.is_skipped(user_name):
-                        skip_filtered += 1   # filtered on an earlier run — config choice, not exhaustion
-                    else:
-                        skip_known += 1
+                    skip_known += 1   # followed, or filtered on an earlier run: not new either way
                     # Likers dialogs are dense with known handles; no visible line, no sleep,
                     # or a 60-row batch would eat the whole per-post budget before any follow.
                     debug_line(client_log_line(account, scope, f"{source}-[-skip] - [{user_name}] - [in database]"))
@@ -332,7 +333,10 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
         else:
             # Manual account group (uniform) or the follow-back-weighted seed pool
             # that grows itself when it runs low.
-            seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(apiClient, account_id, seeds, group_mode)
+            seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(
+                apiClient, account_id, seeds, group_mode,
+                log=lambda m: _p(client_log_line(account, _scope, f"{_lbl}Warning: {m}")),
+            )
             if group_mode == "pool":
                 maybe_discover_seeds(driver, apiClient, account_id, account, seed_pool, all_seeds, group_handles, _scope, _lbl, _p)
             seed_list = order_seeds(seed_pool)
@@ -343,8 +347,14 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
             module_errors_log += f"{action_label or _fallback_label}: {msg}\n"
             return 0, module_errors_log, module_warnings_log
 
+        book = SeedBook(apiClient, account_rate, account, _scope, _lbl, _p, "likers")
         for seed_entry in seed_list:
             if status_store.is_bot_paused() or followed_count >= target_count:
+                break
+            if mode != "topics" and book.tripped():
+                msg = f"[error] {book.consecutive_failures} seeds in a row failed to open - stopped (session problem?)"
+                _p(client_log_line(account, _scope, f"{_lbl}{msg}"))
+                module_errors_log += f"{action_label or _fallback_label}: {msg}\n"
                 break
             seed = seed_entry["handle"]
 
@@ -368,15 +378,42 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                 hsleep(3, 5)
                 if driver.find_elements(By.XPATH, "//*[contains(text(), \"Sorry, this page isn't available.\")]"):
                     msg = f"Target account '{seed}' not found"
-                    _p(client_log_line(account, _scope, f"{_lbl}ERROR: {msg}"))
-                    module_errors_log += f"{action_label or _fallback_label}: {msg}\n"
-                    finish_seed_use(apiClient, seed_entry, None, account_rate, account, _scope, _lbl, _p, retire_reason="not found")
+                    if seed_entry.get("id"):
+                        # A pool seed: the pool handles it (a retirement), so it is no error for the user.
+                        _p(client_log_line(account, _scope, f"{_lbl}Warning: {msg}"))
+                        module_warnings_log += f"{action_label or _fallback_label}: [warning] {msg}\n"
+                    else:
+                        _p(client_log_line(account, _scope, f"{_lbl}ERROR: {msg}"))
+                        module_errors_log += f"{action_label or _fallback_label}: {msg}\n"
+                    book.fail(seed_entry, retire_reason="not found")
                     continue
                 post_links = _collect_post_links(driver, _POSTS_PER_ACCOUNT, include_reels=True)
+
+            if not post_links and mode != "topics":
+                # The grid may render late: wait once before calling the profile empty.
+                try:
+                    WebDriverWait(driver, 8).until(lambda d: d.find_elements(By.CSS_SELECTOR, "a[href*='/p/'], a[href*='/reel/']"))
+                    post_links = _collect_post_links(driver, _POSTS_PER_ACCOUNT, include_reels=True)
+                except Exception:
+                    pass
 
             if not post_links:
                 _p(client_log_line(account, _scope, f"{_lbl}Warning: no posts found for [{seed}]"))
                 module_warnings_log += f"{action_label or _fallback_label}: [warning] no posts found for [{seed}]\n"
+                if mode != "topics":
+                    # A seed with no grid can never yield likers. The private text is positive
+                    # evidence (verified 2026-11-25: 5 of 10 discovered seeds): retire at once.
+                    # "No posts" alone could be a soft block or a late page, so it is one strike
+                    # (the second in a row starts a cool-down) and is not applied at all when no
+                    # seed worked in this run (SeedBook).
+                    try:
+                        _private = bool(driver.find_elements(By.XPATH, _PRIVATE_PAGE_XPATH))
+                    except Exception:
+                        _private = False
+                    if _private:
+                        book.certain(seed_entry, "private profile")
+                    else:
+                        book.fail(seed_entry, soft_reason="no posts")
                 continue
             _p(client_log_line(account, _scope, f"{_lbl}[{seed}] {len(post_links)} post(s) to mine"))
 
@@ -426,17 +463,17 @@ def do_follow_engagers(driver, account, target_count, apiClient, account_id, mod
                 _p(client_log_line(account, _scope, f"{_lbl}Warning: {msg} - trying next seed"))
                 module_warnings_log += f"{action_label or _fallback_label}: {msg}\n"
                 if mode != "topics":
-                    finish_seed_use(apiClient, seed_entry, _ZERO_YIELD_SATURATION, account_rate, account, _scope, _lbl, _p)
+                    book.fail(seed_entry, saturation_pct=_ZERO_YIELD_SATURATION, dry_label="no likes link (like counts hidden?)")
                 continue
 
             module_warnings_log += _saturation_warning(
                 account, _scope, _lbl, action_label or _fallback_label, seed, seed_known, seed_filtered, seed_followed,
+                pool=(mode != "topics" and group_mode == "pool"),
             )
             if mode != "topics":
-                finish_seed_use(
-                    apiClient, seed_entry, _saturation_pct(seed_known, seed_filtered, seed_followed),
-                    account_rate, account, _scope, _lbl, _p,
-                )
+                book.ok(seed_entry, _saturation_pct(seed_known, seed_filtered, seed_followed))
+
+        book.flush()
 
         if followed_count < target_count:
             _p(client_log_line(account, _scope, f"{_lbl}Incomplete[{followed_count}/{target_count}]"))

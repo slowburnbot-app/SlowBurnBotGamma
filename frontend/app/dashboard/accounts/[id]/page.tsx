@@ -515,7 +515,7 @@ export default function AccountDetailPage() {
         {/* Follow Settings */}
         <div className={sectionCls}>
           <div className="px-4 py-2 border-b border-base02 text-base04 bg-base02">follow settings</div>
-          <div className="px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-4">
+          <div className="px-4 py-3 grid grid-cols-1 gap-y-4">
             <div>
               {/* account group: exactly one of the two sections is active; the other dims */}
               <div className="mb-1">
@@ -562,6 +562,9 @@ export default function AccountDetailPage() {
                       {s.complete > 0 ? `${s.followed_back}/${s.complete} (${Math.round((s.rate ?? 0) * 100)}%)` : "----"}
                     </span>
                     {s.last_saturation != null && <span className="text-base04">{`sat ${s.last_saturation}%`}</span>}
+                    {s.last_used_at && <span className="text-base04" title="last used">{`used ${new Date(s.last_used_at).toLocaleDateString()}`}</span>}
+                    {s.strikes > 0 && s.active && <span className="text-base03" title="failures in a row; the second one rests the seed">{`strike ${s.strikes}`}</span>}
+                    {!s.active && s.cooldown_until && <span className="text-base03" title="the seed comes back by itself">{`resting until ${new Date(s.cooldown_until).toLocaleDateString()}`}</span>}
                     {s.origin !== "manual" && <span className="text-base03">{s.origin}</span>}
                     {!s.active && s.retire_reason && <span className="text-base03">{s.retire_reason}</span>}
                     <button type="button" onClick={() => handleDeleteSeed(s)} className="text-base04 hover:text-status-error transition-colors">[del]</button>

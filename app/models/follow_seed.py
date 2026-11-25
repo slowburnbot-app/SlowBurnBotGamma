@@ -38,3 +38,12 @@ class FollowSeed(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # % of the seed's pool that was already known on its last use (bot-reported)
     last_saturation: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # The action (followers | following | similar | likers) that wrote last_saturation.
+    last_action: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Soft failures in a row (for example "no posts"); reset by the next good use.
+    strikes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # A recoverable retirement (exhausted seed): the server re-activates the seed after this time.
+    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Tombstone of a seed the user removed: kept (so discovery and the typed account group do not
+    # bring the handle back) but hidden from the dashboard list.
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

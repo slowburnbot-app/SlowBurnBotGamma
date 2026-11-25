@@ -177,19 +177,18 @@ _PAGE_SIZE = 5000
 def load_known_handles(apiClient, account_id, account, scope, lbl, _p):
     """Previous follow targets (any status) + the universal ignore list."""
     known = KnownHandles()
-    try:
-        page = 1
-        while True:
-            targets = apiClient.get_follow_targets(account_id, page=page, page_size=_PAGE_SIZE)
-            if not targets:
-                break
-            for t in targets:
-                known.add(t.get("target_handle"), skipped=t.get("status") in _SKIP_STATUSES)
-            if len(targets) < _PAGE_SIZE:
-                break
-            page += 1
-    except Exception as e:
-        _p(client_log_line(account, scope, f"{lbl}Warning: Could not load follow targets: {e}"))
+    # No try/except here on purpose: a partial set would follow people again and write
+    # duplicates, so a failed fetch ends the action with a logged error instead.
+    page = 1
+    while True:
+        targets = apiClient.get_follow_targets(account_id, page=page, page_size=_PAGE_SIZE, raise_on_error=True)
+        if not targets:
+            break
+        for t in targets:
+            known.add(t.get("target_handle"), skipped=t.get("status") in _SKIP_STATUSES)
+        if len(targets) < _PAGE_SIZE:
+            break
+        page += 1
     try:
         for h in apiClient.get_ignore_handles():
             known.add(h)

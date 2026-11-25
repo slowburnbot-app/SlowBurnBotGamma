@@ -14,7 +14,7 @@ from burnBot_client_log import client_log_line
 from burnBot_run_log import debug_line
 from burnBot_followSuggested import _find_home_follow_candidates
 from burnBot_followFilter import load_known_handles, screen_candidate
-from burnBot_seeds import load_seed_pool, order_seeds, finish_seed_use, maybe_discover_seeds
+from burnBot_seeds import load_seed_pool, order_seeds, maybe_discover_seeds, SeedBook
 import burnBot_status as status_store
 import burnBot_actionLimit as limit
 
@@ -24,6 +24,9 @@ _p = _builtins.print  # set per-call by do_follow_group; safe because sessions r
 # that happens to open on a run of already-followeds doesn't cry wolf.
 _SATURATION_MIN_ENTRIES = 40
 _SATURATION_WARN_RATIO = 0.80
+# A pool strike needs a meaningful sample too: a use that follows someone after only a few
+# rows says nothing about exhaustion (a use with no follow at all is judged as it stands).
+_SATURATION_MIN_ROWS = 20
 
 # A profile page carries a "Suggested for you" carousel of accounts related to
 # that profile. On profiles the viewing account does NOT follow it renders
@@ -50,23 +53,29 @@ _MAX_DIALOG_STALLS = 3  # dialog scrolls with no unseen rows before treating the
 
 
 def _saturation_pct(skip_already, skip_private, followed_count):
-    """% of processed entries that could never produce a follow from this pool
-    (already known); None when nothing was processed."""
+    """% of processed entries that were not new to this account (already known: followed
+    before, or filtered out on an earlier run). skip_private counts only rows filtered
+    for the first time in this use. None when nothing was processed, or when the sample
+    is too small to judge a use that did follow someone."""
     processed = skip_already + skip_private + followed_count
     if processed <= 0:
+        return None
+    if followed_count > 0 and processed < _SATURATION_MIN_ROWS:
         return None
     return round(skip_already / processed * 100)
 
 
-def _saturation_warning(account, scope, lbl, action_label, target_account, skip_already, skip_private, followed_count):
+def _saturation_warning(account, scope, lbl, action_label, target_account, skip_already, skip_private, followed_count, pool=False):
     """Saturation check: how much of the target's pool was un-followable.
-    Prints the warning/debug line and returns the text to append to the module warnings log."""
+    Prints the warning/debug line and returns the text to append to the module warnings log.
+    pool=True: the seed pool rests an exhausted seed by itself, so there is nothing for the
+    user to do: debug line only, no "rotate targets" warning."""
     processed = skip_already + skip_private + followed_count
     pct = _saturation_pct(skip_already, skip_private, followed_count)
     if pct is None:
         return ""
     saturation = pct / 100
-    if processed >= _SATURATION_MIN_ENTRIES and saturation >= _SATURATION_WARN_RATIO:
+    if not pool and processed >= _SATURATION_MIN_ENTRIES and saturation >= _SATURATION_WARN_RATIO:
         _p(client_log_line(account, scope, f"{lbl}Warning: [{target_account}] {pct}% saturated ({skip_already} of {processed} entries already followed) - consider rotating target accounts"))
         return f"{action_label}: [{target_account}] {pct}% saturated ({skip_already}/{processed} already followed) - rotate targets\n"
     debug_line(client_log_line(account, scope, f"{lbl}debug target [{target_account}] saturation {pct}% ({skip_already} of {processed} entries already followed)"))
@@ -230,10 +239,7 @@ def _harvest_similar_accounts(driver, account, target_count, apiClient, account_
 
             try:
                 if user_name in database_names:
-                    if database_names.is_skipped(user_name):
-                        skip_private += 1   # filtered on an earlier run — a config choice, not exhaustion
-                    else:
-                        skip_already += 1
+                    skip_already += 1   # followed, or filtered on an earlier run: not new either way
                     _p(client_log_line(account, scope, f"{target_account}[{action_type}]-[-skip] - [{user_name}] - [in database]"))
                     hsleep(1, 1)
                     continue
@@ -342,7 +348,10 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         database_names = load_known_handles(apiClient, account_id, account, _scope, _lbl, _p)
 
         # Target pool: the manual account-group list, or the self-managing seed pool
-        seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(apiClient, account_id, target_accounts, group_mode)
+        seed_pool, account_rate, all_seeds, group_handles = load_seed_pool(
+            apiClient, account_id, target_accounts, group_mode,
+            log=lambda m: _p(client_log_line(account, _scope, f"{_lbl}Warning: {m}")),
+        )
         if group_mode == "pool":
             maybe_discover_seeds(driver, apiClient, account_id, account, seed_pool, all_seeds, group_handles, _scope, _lbl, _p)
         if not seed_pool:
@@ -375,8 +384,13 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
 
             if driver.find_elements(By.XPATH, "//*[contains(text(), \"Sorry, this page isn't available.\")]"):
                 msg = f"Target account '{target_account}' not found"
-                _p(client_log_line(account, _scope, f"{_lbl}ERROR: {msg}"))
-                r["errors"] += f"{_warn_lbl}: {msg}\n"
+                if seed.get("id"):
+                    # A pool seed: the pool handles it (a retirement), so it is no error for the user.
+                    _p(client_log_line(account, _scope, f"{_lbl}Warning: {msg}"))
+                    r["warnings"] += f"{_warn_lbl}: [warning] {msg}\n"
+                else:
+                    _p(client_log_line(account, _scope, f"{_lbl}ERROR: {msg}"))
+                    r["errors"] += f"{_warn_lbl}: {msg}\n"
                 r["not_found"] = True
                 return r
 
@@ -521,10 +535,7 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                     try:
                         # Check if already in database
                         if user_name in database_names:
-                            if database_names.is_skipped(user_name):
-                                r["skip_private"] += 1   # filtered on an earlier run — a config choice, not exhaustion
-                            else:
-                                r["skip_already"] += 1
+                            r["skip_already"] += 1   # followed, or filtered on an earlier run: not new either way
                             _p(client_log_line(account, _scope, f"{target_source}-[-skip] - [{user_name}] - [in database]"))
                             hsleep(1, 1)
                             continue
@@ -623,8 +634,11 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
         # Try targets in weighted order until the count is met or tries run out
         # ------------------------------------------------------------------
         tried = 0
+        book = SeedBook(apiClient, account_rate, account, _scope, _lbl, _p, action_type)
         for seed in order_seeds(seed_pool):
             if status_store.is_bot_paused() or followed_count >= target_count or tried >= _MAX_TARGET_TRIES:
+                break
+            if book.tripped():
                 break
             tried += 1
             target_account = seed["handle"]
@@ -640,8 +654,11 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                 # so no saturation bookkeeping — just stop following.
                 break
 
+            if r["paused"] and r["processed"] == 0:
+                break   # a pause is not a seed-quality signal
+
             if r["not_found"]:
-                finish_seed_use(apiClient, seed, None, account_rate, account, _scope, _lbl, _p, retire_reason="not found")
+                book.fail(seed, retire_reason="not found")
                 continue
 
             if r["processed"] == 0:
@@ -652,18 +669,22 @@ def do_follow_group(driver, account, target_count, apiClient, account_id, group_
                 _p(client_log_line(account, _scope, f"{_lbl}Warning: {msg} - trying next target"))
                 if not r["warnings"]:   # a "no Similar panel" warning already explains this target
                     module_warnings_log += f"{_warn_lbl}: {msg}\n"
-                finish_seed_use(apiClient, seed, _ZERO_YIELD_SATURATION, account_rate, account, _scope, _lbl, _p)
+                book.fail(seed, saturation_pct=_ZERO_YIELD_SATURATION, dry_label="no candidates")
                 continue
 
             module_warnings_log += _saturation_warning(
                 account, _scope, _lbl, _warn_lbl, target_account, r["skip_already"], r["skip_private"], r["followed"],
+                pool=(group_mode == "pool"),
             )
-            finish_seed_use(
-                apiClient, seed, _saturation_pct(r["skip_already"], r["skip_private"], r["followed"]),
-                account_rate, account, _scope, _lbl, _p,
-            )
+            book.ok(seed, _saturation_pct(r["skip_already"], r["skip_private"], r["followed"]))
             if r["paused"]:
                 break
+
+        book.flush()
+        if book.tripped():
+            msg = f"[error] {book.consecutive_failures} targets in a row failed to open - stopped (session problem?)"
+            _p(client_log_line(account, _scope, f"{_lbl}{msg}"))
+            module_errors_log += f"{_warn_lbl}: {msg}\n"
 
         if followed_count >= target_count:
             _p(client_log_line(account, _scope, f"{_done_lbl}-Completed[{followed_count}/{target_count}]"))

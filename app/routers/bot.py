@@ -61,7 +61,7 @@ from app.schemas.bot import (
 from app.schemas.desktop_build import DesktopActivateRequest
 from app.schemas.follow_seed import BotFollowSeedCreate, BotFollowSeedUpdate, FollowSeedListRead, FollowSeedRead
 from app.services.action_limits import active_limits, record_action_limit, record_status_page_check
-from app.services.follow_seeds import list_seeds, normalize_handle, seed_stats_by_handle, seed_to_dict
+from app.services.follow_seeds import list_seeds, normalize_handle, reactivate_cooled_seeds, seed_stats_by_handle, seed_to_dict
 from app.services.notifications import NotificationError, send_email, send_sms
 from app.settings import settings
 
@@ -458,7 +458,8 @@ async def get_bot_follow_targets(
     if older_than_days is not None:
         cutoff = date.today() - timedelta(days=older_than_days)
         query = query.where(FollowTarget.follow_date <= cutoff)
-    query = query.order_by(FollowTarget.follow_date.asc().nullslast())
+    # id breaks ties: with follow_date alone, rows with the same date could move between pages
+    query = query.order_by(FollowTarget.follow_date.asc().nullslast(), FollowTarget.id)
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await session.execute(query)
     return [FollowTargetRead.model_validate(t, from_attributes=True) for t in result.scalars().all()]
@@ -472,9 +473,40 @@ async def create_bot_follow_target(
 ):
     """Create a new follow target record from the exe."""
     await _assert_account_owned(body.account_id, user, session)
+
+    async def _existing() -> FollowTarget | None:
+        return (await session.execute(
+            select(FollowTarget).where(
+                FollowTarget.account_id == body.account_id,
+                func.lower(FollowTarget.target_handle) == body.target_handle.strip().lower(),
+            )
+        )).scalar_one_or_none()
+
+    def _refollow(row: FollowTarget) -> None:
+        # The handle is known already (one row per account and handle). A new follow of a
+        # finished row (done / skipped) starts a new cycle on the same row, so the unfollow
+        # step still finds it; any other repeat is answered with the existing row unchanged.
+        if body.status == "following" and row.status != "following":
+            row.status = "following"
+            row.source = body.source
+            row.follow_date = body.follow_date
+            row.unfollow_date = None
+            row.follow_back = None
+
+    existing = await _existing()
+    if existing is not None:
+        _refollow(existing)
+        await session.commit()
+        return {"id": str(existing.id)}
     target = FollowTarget(**body.model_dump(), user_id=user.id)
     session.add(target)
-    await session.commit()
+    if not await commit_tolerating_race(session):   # a parallel request inserted the same handle
+        existing = await _existing()
+        if existing is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Follow target conflict.")
+        _refollow(existing)
+        await session.commit()
+        return {"id": str(existing.id)}
     return {"id": str(target.id)}
 
 
@@ -655,7 +687,8 @@ async def get_bot_seeds(
     """All seeds (retired included) with follow-back numbers. The bot picks from
     the active ones and uses the full list to avoid re-discovering retired handles."""
     await _assert_account_owned(account_id, user, session)
-    return await list_seeds(session, account_id)
+    await reactivate_cooled_seeds(session, account_id)
+    return await list_seeds(session, account_id, include_removed=True)
 
 
 @router.post("/seeds", response_model=FollowSeedRead, status_code=status.HTTP_201_CREATED)

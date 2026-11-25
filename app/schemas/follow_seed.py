@@ -15,6 +15,10 @@ class FollowSeedRead(BaseModel):
     retire_reason: str | None = None
     last_used_at: datetime | None = None
     last_saturation: int | None = None
+    last_action: str | None = None
+    strikes: int = 0
+    cooldown_until: datetime | None = None
+    removed_at: datetime | None = None
     # Derived from follow_targets whose source starts with "<handle>[" (all-time)
     total: int = 0
     complete: int = 0
@@ -46,5 +50,8 @@ class BotFollowSeedCreate(BaseModel):
 class BotFollowSeedUpdate(BaseModel):
     last_used_at: datetime | None = None
     last_saturation: int | None = None
+    last_action: str | None = Field(default=None, max_length=30)
+    strikes: int | None = Field(default=None, ge=0)
+    cooldown_until: datetime | None = None
     active: bool | None = None
     retire_reason: str | None = Field(default=None, max_length=200)

@@ -31,7 +31,7 @@ from app.schemas.account_settings import AccountSettingsRead, AccountSettingsUpd
 from app.schemas.action_limit import ActionLimitRead, ActiveActionLimit
 from app.schemas.follow_seed import FollowSeedCreate, FollowSeedListRead, FollowSeedRead, FollowSeedUpdate
 from app.services.action_limits import active_limits
-from app.services.follow_seeds import list_seeds, normalize_handle, seed_stats_by_handle, seed_to_dict
+from app.services.follow_seeds import list_seeds, normalize_handle, remove_seed, reset_seed_state, seed_stats_by_handle, seed_to_dict
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -860,9 +860,7 @@ async def add_follow_seed(
         seed = FollowSeed(user_id=user.id, account_id=account_id, handle=handle, origin="manual", active=True)
         session.add(seed)
     else:
-        seed.active = True
-        seed.retired_at = None
-        seed.retire_reason = None
+        reset_seed_state(seed)
     await session.commit()
     await session.refresh(seed)
     stats, _ = await seed_stats_by_handle(session, account_id)
@@ -887,11 +885,11 @@ async def update_follow_seed(
     if body.active is not None:
         seed.active = body.active
         if body.active:
-            seed.retired_at = None
-            seed.retire_reason = None
+            reset_seed_state(seed)
         else:
             seed.retired_at = datetime.now(timezone.utc)
             seed.retire_reason = "disabled by user"
+            seed.cooldown_until = None   # a disabled seed stays disabled
     await session.commit()
     await session.refresh(seed)
     stats, _ = await seed_stats_by_handle(session, account_id)
@@ -912,6 +910,6 @@ async def delete_follow_seed(
     seed = result.scalar_one_or_none()
     if seed is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seed not found.")
-    await session.delete(seed)
+    remove_seed(seed, datetime.now(timezone.utc))   # tombstone, not a delete: see FollowSeed.removed_at
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

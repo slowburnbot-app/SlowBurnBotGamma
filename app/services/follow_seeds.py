@@ -7,6 +7,7 @@ gives each seed its all-time follow-back numbers.
 """
 import uuid
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,6 +66,10 @@ def seed_to_dict(seed: FollowSeed, stats: dict[str, dict]) -> dict:
         "retire_reason": seed.retire_reason,
         "last_used_at": seed.last_used_at,
         "last_saturation": seed.last_saturation,
+        "last_action": seed.last_action,
+        "strikes": seed.strikes or 0,
+        "cooldown_until": seed.cooldown_until,
+        "removed_at": seed.removed_at,
         "total": s["total"],
         "complete": s["complete"],
         "followed_back": s["followed_back"],
@@ -72,8 +77,67 @@ def seed_to_dict(seed: FollowSeed, stats: dict[str, dict]) -> dict:
     }
 
 
-async def list_seeds(session: AsyncSession, account_id: uuid.UUID, active_only: bool = False) -> dict:
+def reactivate_if_cooled(seed: FollowSeed, now: datetime) -> bool:
+    """Bring a seed back when its cool-down has ended. Returns True when it changed.
+    Only a seed with a cool-down comes back: a permanent retirement (private profile,
+    not found, low follow-back, disabled by the user) has no cooldown_until."""
+    if seed.active or seed.removed_at is not None or seed.cooldown_until is None or seed.cooldown_until > now:
+        return False
+    seed.active = True
+    seed.retired_at = None
+    seed.retire_reason = None
+    seed.cooldown_until = None
+    seed.last_saturation = None
+    seed.last_action = None
+    seed.strikes = 0
+    return True
+
+
+def reset_seed_state(seed: FollowSeed) -> None:
+    """A user re-enables a seed: forget the old strikes, saturation and cool-down, so the
+    seed does not come back one strike from retirement."""
+    seed.active = True
+    seed.retired_at = None
+    seed.retire_reason = None
+    seed.cooldown_until = None
+    seed.removed_at = None
+    seed.last_saturation = None
+    seed.last_action = None
+    seed.strikes = 0
+
+
+def remove_seed(seed: FollowSeed, now: datetime) -> None:
+    """The user removes a seed: keep the row as a tombstone (inactive, hidden, no way back)."""
+    seed.active = False
+    seed.retired_at = now
+    seed.retire_reason = "removed by user"
+    seed.cooldown_until = None
+    seed.removed_at = now
+
+
+async def reactivate_cooled_seeds(session: AsyncSession, account_id: uuid.UUID) -> int:
+    now = datetime.now(timezone.utc)
+    result = await session.execute(
+        select(FollowSeed).where(
+            FollowSeed.account_id == account_id,
+            FollowSeed.active == False,  # noqa: E712
+            FollowSeed.cooldown_until.isnot(None),
+            FollowSeed.cooldown_until <= now,
+        )
+    )
+    changed = sum(1 for s in result.scalars().all() if reactivate_if_cooled(s, now))
+    if changed:
+        await session.commit()
+    return changed
+
+
+async def list_seeds(session: AsyncSession, account_id: uuid.UUID, active_only: bool = False,
+                     include_removed: bool = False) -> dict:
+    """include_removed: the bot needs the tombstones (so it never re-adds a removed handle);
+    the dashboard does not show them."""
     query = select(FollowSeed).where(FollowSeed.account_id == account_id)
+    if not include_removed:
+        query = query.where(FollowSeed.removed_at.is_(None))
     if active_only:
         query = query.where(FollowSeed.active == True)  # noqa: E712
     query = query.order_by(FollowSeed.active.desc(), FollowSeed.added_at.asc())
