@@ -256,6 +256,18 @@ jobs:
           pyinstaller SlowBurnBot.linux.spec --distpath ../dist --workpath ../build
           cp ../dist/slowburnbot .
 
+      - name: Check that the runtime image can load the bundled libraries
+        # PyInstaller binds the libraries to the glibc of this runner. v1.220 built on a runner with
+        # glibc 2.42, the image has 2.41, and the container failed at start while this run was green.
+        # The limit is the glibc of the image in the FROM line of the Dockerfile. This step runs
+        # before the image push, so a bad build never reaches :latest.
+        run: |
+          # The Dockerfile has CRLF line endings: strip the carriage return from the image name.
+          IMG=$(awk '/^FROM/{print $2; exit}' bot-client/Dockerfile.linux | tr -d '\r')
+          MAX=$(docker run --rm "$IMG" ldd --version | head -1 | grep -oE '[0-9]+\.[0-9]+$')
+          echo "runtime image ${IMG} has glibc ${MAX}"
+          python scripts/check_glibc.py bot-client/slowburnbot --max "${MAX}"
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -325,6 +337,18 @@ jobs:
         run: |
           pyinstaller SlowBurnBot.linux.spec --distpath ../dist --workpath ../build
           cp ../dist/slowburnbot .
+
+      - name: Check that the runtime image can load the bundled libraries
+        # PyInstaller binds the libraries to the glibc of this runner. v1.220 built on a runner with
+        # glibc 2.42, the image has 2.41, and the container failed at start while this run was green.
+        # The limit is the glibc of the image in the FROM line of the Dockerfile. This step runs
+        # before the image push, so a bad build never reaches :latest.
+        run: |
+          # The Dockerfile has CRLF line endings: strip the carriage return from the image name.
+          IMG=$(awk '/^FROM/{print $2; exit}' bot-client/Dockerfile.linux | tr -d '\r')
+          MAX=$(docker run --rm "$IMG" ldd --version | head -1 | grep -oE '[0-9]+\.[0-9]+$')
+          echo "runtime image ${IMG} has glibc ${MAX}"
+          python scripts/check_glibc.py bot-client/slowburnbot --max "${MAX}"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
