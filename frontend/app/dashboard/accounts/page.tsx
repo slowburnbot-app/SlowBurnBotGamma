@@ -465,7 +465,7 @@ export default function AccountsPage() {
                 return (
                   <tr className="border-t border-base02 bg-base02 text-base05">
                     <td className={cell}></td>
-                    <td className="px-2 pr-4 py-2 whitespace-nowrap">{tab === "settings" || tab === "status" ? "" : "Total"}</td>
+                    <td className="px-2 pr-4 py-2 whitespace-nowrap">{tab === "settings" || tab === "status" ? "\u00a0" : "Total"}</td>
                     {tab === "settings" && (
                       <>
                         <td className={cell}></td>
