@@ -48,13 +48,13 @@ Check that the seed pool of bot v1.223 works in real runs. Then make the rate ru
 
 ## Plan
 
-1. [ ] Pull the run logs of `timeforashifty` (`scripts/fetch_run_logs.py`) after its first run on v1.223. Check: no "no posts found" lines, no crash in the account-list actions (the call order of `action_type` changed in `bot-client/burnBot_followGroup.py`), any "retiring seed" or "resting" line names the action, the pool stays above 10.
-2. [ ] Check the log of the other 3 clients for errors (`docker logs slowburn-client0N`, strip ANSI).
+1. [x] Done 2026-11-26 (3 sessions of `timeforashifty` on v1.223: all complete, no crash, no "no posts" line, no retire or rest line yet; saturation lines 90%, 98%, 100% were first uses; 4 to 5 follows in sessions 2 and 3). Pull the run logs of `timeforashifty` (`scripts/fetch_run_logs.py`) after its first run on v1.223. Check: no "no posts found" lines, no crash in the account-list actions (the call order of `action_type` changed in `bot-client/burnBot_followGroup.py`), any "retiring seed" or "resting" line names the action, the pool stays above 10.
+2. [x] Done 2026-11-26 (no traceback in the last 20 h on all 4 clients). Check the log of the other 3 clients for errors (`docker logs slowburn-client0N`, strip ANSI).
 3. [ ] The user turns `two_robbers` on again on the dashboard.
 4. [ ] Make the rate rule stateless and per action: decide at load time in `load_seed_pool` and `decide_seed_use` (`bot-client/burnBot_seeds.py`), exclude or floor the seed for that run, write no retirement.
 5. [ ] Add a window (`follow_date` in the last 120 days) to `by_action` and `action_rates` in `app/services/follow_seeds.py`. Keep the all-time numbers for the dashboard.
 6. [ ] Decide on a pool average without the seed's own data, and on `MIN_POOL_RATE_SAMPLE` 100.
-7. [ ] Decision for the user: make the retire and rest rules apply to accounts in `manual` mode (a manual list has no seed rows, so no seed rests there). Options to consider: convert the list to seed rows for that account, or move the account to `pool` mode.
+7. [x] Done 2026-11-26: the user switched `triagespirits` and `theburleybar` to `pool` mode. Next: check their first pool-mode runs for seed rows and rests. (Was: decision for the user: make the retire and rest rules apply to accounts in `manual` mode (a manual list has no seed rows, so no seed rests there). Options to consider: convert the list to seed rows for that account, or move the account to `pool` mode.)
 8. [ ] Make a helper for CRLF-safe edits and for read-only production queries (a script in `scripts/`, or a skill).
 
 ## Key files
