@@ -40,6 +40,11 @@ function fmtTime(iso: string | null): string {
   return `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")}${period}`;
 }
 
+// Recent Activity: "like (8)" -> "like(8)" to save horizontal space.
+function compactAction(type: string | null | undefined, count: number): string {
+  return formatSessionAction(type, count).replace(" (", "(");
+}
+
 function fmtGroup(n: number | null | undefined): string {
   if (n == null) return "—";
   return String(n).padStart(2, "0");
@@ -613,16 +618,16 @@ export default function DashboardPage() {
                     <td className="px-2 py-1.5 text-base04 whitespace-nowrap">{fmtTime(entry.start_time)}</td>
                     <td className="px-2 py-1.5 text-base04 whitespace-nowrap">{fmtTime(entry.end_time)}</td>
                     <td className="px-2 py-1.5 text-base04 whitespace-nowrap">
-                      {formatSessionAction(entry.action_1_type, entry.action_1_count)}
+                      {compactAction(entry.action_1_type, entry.action_1_count)}
                     </td>
                     <td className="px-2 py-1.5 text-base04 whitespace-nowrap">
-                      {formatSessionAction(entry.action_2_type, entry.action_2_count)}
+                      {compactAction(entry.action_2_type, entry.action_2_count)}
                     </td>
                     <td className="px-2 py-1.5 text-base04 whitespace-nowrap">
-                      {formatSessionAction(entry.action_3_type, entry.action_3_count)}
+                      {compactAction(entry.action_3_type, entry.action_3_count)}
                     </td>
                     <td className="px-2 py-1.5 text-base04 whitespace-nowrap">
-                      {formatSessionAction(entry.action_4_type, entry.action_4_count)}
+                      {compactAction(entry.action_4_type, entry.action_4_count)}
                     </td>
                     <td className="px-2 py-1.5 whitespace-nowrap">
                       {entry.error_message || entry.warning_message ? (
