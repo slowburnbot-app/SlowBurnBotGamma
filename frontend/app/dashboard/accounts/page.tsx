@@ -446,6 +446,74 @@ export default function AccountsPage() {
                 );
               })}
             </tbody>
+            <tfoot>
+              {(() => {
+                const sum = (f: (id: string) => number | null | undefined) =>
+                  sortedAccounts.reduce((n, a) => n + (f(a.id) ?? 0), 0);
+                const hasLog = sortedAccounts.some((a) => logMap[a.id]);
+                const hasFb = sortedAccounts.some((a) => fbMap[a.id]);
+                const hasStats = sortedAccounts.some((a) => statsMap[a.id]);
+                const tot = (show: boolean, f: (id: string) => number | null | undefined) =>
+                  show ? fmtNum(sum(f)) : "----";
+                const fbComplete = sum((id) => fbMap[id]?.complete);
+                const fbBack = sum((id) => fbMap[id]?.followed_back);
+                const fbDaily = sortedAccounts.reduce((n, a) => {
+                  const e = fbMap[a.id];
+                  return e?.days ? n + (e.followed_back ?? 0) / e.days : n;
+                }, 0);
+                const cell = "px-[4px] py-2 whitespace-nowrap";
+                return (
+                  <tr className="border-t border-base02 bg-base02 text-base05">
+                    <td className={cell}></td>
+                    <td className="px-2 pr-4 py-2 whitespace-nowrap">Total</td>
+                    {tab === "settings" && (
+                      <>
+                        <td className={cell}>----</td>
+                        <td className={cell}>----</td>
+                        <td className={cell}>----</td>
+                        <td className={cell}>----</td>
+                        <td className={cell}>----</td>
+                      </>
+                    )}
+                    {tab === "activity" && (
+                      <>
+                        <td className={cell}>{tot(hasLog, (id) => logMap[id]?.sessions)}</td>
+                        <td className={cell}>{tot(hasLog, (id) => logMap[id]?.likes)}</td>
+                        <td className={cell}>{tot(hasLog, (id) => logMap[id]?.follows)}</td>
+                        <td className={cell}>{tot(hasLog, (id) => logMap[id]?.unfollows)}</td>
+                      </>
+                    )}
+                    {tab === "stats" && (
+                      <>
+                        <td className={cell}>{hasFb ? fmtNum(fbComplete) : "----"}</td>
+                        <td className={cell}>{hasFb ? fmtNum(fbBack) : "----"}</td>
+                        <td className={cell}>{hasFb && fbComplete ? fmtPct(fbBack / fbComplete) : "----"}</td>
+                        <td className={cell}>{hasFb ? fbDaily.toFixed(1) : "----"}</td>
+                      </>
+                    )}
+                    {tab === "database" && (
+                      <>
+                        <td className={cell}>{tot(hasStats, (id) => statsMap[id]?.following)}</td>
+                        <td className={cell}>{tot(hasStats, (id) => statsMap[id]?.unfollow_ready)}</td>
+                        <td className={cell}>{tot(hasStats, (id) => statsMap[id]?.complete)}</td>
+                        <td className={cell}>{tot(hasStats, (id) => statsMap[id]?.ignored)}</td>
+                        <td className={cell}>{tot(hasStats, (id) => statsMap[id]?.total)}</td>
+                        <td className={cell}>{tot(hasStats, (id) => statsMap[id]?.success)}</td>
+                      </>
+                    )}
+                    {tab === "status" && (
+                      <>
+                        <td className={cell}>----</td>
+                        <td className={cell}>----</td>
+                        <td className={cell}>----</td>
+                        <td className={cell}>----</td>
+                      </>
+                    )}
+                    <td className="px-[4px] py-2"></td>
+                  </tr>
+                );
+              })()}
+            </tfoot>
           </table>
           </div>
         )}
