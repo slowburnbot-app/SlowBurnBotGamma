@@ -38,7 +38,7 @@ follow filters in real sessions.
   - Follow count of `triagespirits`: 12 follows for a goal of 26 in 8 runs (3 runs complete). There were
     552 "in database" skips and the same targets repeat (`kinseywhiskey`, `usbgphilly`, `single_prop`,
     `bigspringspirits`, `masondixondistillery`). The account uses the manual list, where no target ever
-    retires (see item #12, step 2).
+    retires (see item #99, step 7).
   - `theburleybar` ran the action once in 4 days (the other runs have `follow[similar]-disabled`).
 
 ## Decisions
